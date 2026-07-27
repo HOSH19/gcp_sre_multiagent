@@ -1,5 +1,5 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8080";
-export const CHAOS_URL = process.env.NEXT_PUBLIC_CHAOS_URL ?? "http://127.0.0.1:8082";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api/backend";
+export const CHAOS_URL = process.env.NEXT_PUBLIC_CHAOS_URL ?? "/api/chaos";
 export const CHAOS_TOKEN = process.env.NEXT_PUBLIC_CHAOS_TOKEN ?? "dev-chaos-token";
 
 export type ScenarioId = "http_500s" | "missing_config" | "bad_revision_traffic";

@@ -2,7 +2,7 @@ import { API_URL, CHAOS_TOKEN, CHAOS_URL, type Run, type ScenarioId } from "./ty
 
 export async function fetchApiHealth(): Promise<string> {
   try {
-    const j = await fetch(`${API_URL}/healthz`).then((r) => r.json());
+    const j = await fetch(`${API_URL}/health`).then((r) => r.json());
     return `${j.mode} · ok`;
   } catch {
     return "unreachable";

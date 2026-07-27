@@ -4,7 +4,7 @@ export const config = {
   projectId: process.env.GCP_PROJECT_ID ?? "local-project",
   region: process.env.GCP_REGION ?? "us-central1",
   webOrigin: process.env.WEB_ORIGIN ?? "http://127.0.0.1:3000",
-  patientHealthUrl: process.env.PATIENT_HEALTH_URL ?? "http://127.0.0.1:8081/healthz",
+  patientHealthUrl: process.env.PATIENT_HEALTH_URL ?? "http://127.0.0.1:8081/health",
   patientServiceName: process.env.PATIENT_SERVICE_NAME ?? "patient",
   chaosControllerUrl: process.env.CHAOS_CONTROLLER_URL ?? "http://127.0.0.1:8082",
   chaosAdminToken: process.env.CHAOS_ADMIN_TOKEN ?? "dev-chaos-token",

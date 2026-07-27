@@ -7,7 +7,7 @@ import { injectScenario, patchEnv, resetAll, rollbackTraffic } from "./scenarios
 const VALID: ScenarioId[] = ["http_500s", "missing_config", "bad_revision_traffic"];
 
 export function registerRoutes(app: Hono): void {
-  app.get("/healthz", (c) => c.json({ ok: true, service: "chaos-controller", mode: MODE }));
+  app.get("/health", (c) => c.json({ ok: true, service: "chaos-controller", mode: MODE }));
 
   app.get("/state", (c) => {
     if (!isAuthed((n) => c.req.header(n))) return c.json({ error: "unauthorized" }, 401);

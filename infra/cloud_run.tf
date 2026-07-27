@@ -62,12 +62,12 @@ resource "google_cloud_run_v2_service" "patient" {
 
 resource "google_monitoring_uptime_check_config" "patient" {
   count        = var.patient_image != "" ? 1 : 0
-  display_name = "patient-healthz"
+  display_name = "patient-health"
   timeout      = "10s"
   period       = "60s"
 
   http_check {
-    path         = "/healthz"
+    path         = "/health"
     port         = 443
     use_ssl      = true
     request_method = "GET"

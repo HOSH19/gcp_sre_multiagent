@@ -6,7 +6,7 @@ function missingConfig(): boolean {
 }
 
 export function registerHealthRoutes(app: Hono): void {
-  app.get("/healthz", (c) => {
+  app.get("/health", (c) => {
     if (missingConfig()) {
       return c.json({ ok: false, reason: "missing_required_env", key: REQUIRED_CONFIG_KEY, revision: REVISION_LABEL }, 503);
     }

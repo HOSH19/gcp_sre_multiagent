@@ -68,11 +68,21 @@ Open http://127.0.0.1:3000 — private console for local demos. On GCP, deploy w
 
 ## GCP deploy (outline)
 
-1. Copy `infra/terraform.tfvars.example` → `terraform.tfvars` and set `project_id` (+ optional billing account).
-2. `cd infra && terraform init && terraform apply` — enables APIs, Firestore, BigQuery, Pub/Sub, budgets, secrets.
-3. Build/push images for `patient`, `chaos-controller`, `api`, `web`.
-4. Deploy Cloud Run services with `MODE=gcp`, wire Pub/Sub push to `POST /hooks/pubsub`, attach Monitoring alert policy.
-5. Grant the API runtime SA: Cloud Run Admin (patient only), Logging Viewer, Error Reporting Viewer, Vertex User, Firestore, BigQuery Data Editor.
+1. Create a dedicated GCP project (do not reuse unrelated projects).
+2. Phase 1: enable APIs, Artifact Registry (`sre-agents`), Secret Manager (`chaos-admin-token`), budgets.
+3. Phase 2: `./scripts/deploy-cloud-run.sh` — builds/pushes images and deploys `patient`, `chaos-controller`, `api`.
+4. `./scripts/deploy-web.sh` — private Next.js console with server-side BFF to API/chaos.
+5. `./scripts/setup-monitoring.sh` — uptime check + alert → Pub/Sub → `POST /hooks/pubsub`.
+
+Health endpoints use `/health` (Cloud Run frontends can intercept `/healthz`).
+
+Open the private UI locally:
+
+```bash
+gcloud run services proxy web --project=sre-multiagent --region=us-central1 --port=8080
+# http://127.0.0.1:8080
+```
+
 
 ## Demo video checklist
 
