@@ -1,0 +1,50 @@
+import { AGENT_MODELS, AGENT_TOOLS, type EvidenceItem, type InvestigationRun, type Specialist } from "@gcp-sre/shared";
+import { generateText } from "../llm/index.js";
+import { appendEvent, saveRun, syncRunToFirestore } from "../store/index.js";
+import { toolHandlers, type ToolName } from "../tools/index.js";
+import { assertCaps } from "./caps.js";
+
+function isEvidence(value: unknown): value is EvidenceItem {
+  return Boolean(value && typeof value === "object" && "id" in value && "source" in value);
+}
+
+export async function runTool(run: InvestigationRun, agent: Specialist, tool: string): Promise<unknown> {
+  if (!AGENT_TOOLS[agent].includes(tool)) throw new Error(`tool ${tool} not allowed for ${agent}`);
+  run.toolCallCount += 1;
+  assertCaps(run);
+  appendEvent(run.id, { agent, type: "tool_call", message: `Calling ${tool}`, data: { tool } });
+
+  const handler = toolHandlers[tool as ToolName];
+  if (!handler) throw new Error(`unknown tool ${tool}`);
+  const result = await handler();
+
+  if (isEvidence(result)) run.evidence.push(result);
+  appendEvent(run.id, { agent, type: "tool_result", message: `Result from ${tool}`, data: result });
+  saveRun(run);
+  await syncRunToFirestore(run);
+  return result;
+}
+
+export async function llmStep(
+  run: InvestigationRun,
+  agent: Specialist,
+  system: string,
+  prompt: string,
+  mockText: string,
+): Promise<string> {
+  assertCaps(run);
+  run.stepCount += 1;
+  const model = AGENT_MODELS[agent];
+  const result = await generateText({ model, system, prompt, mockText });
+  appendEvent(run.id, {
+    agent,
+    type: "thought",
+    message: result.text.slice(0, 500),
+    tokensIn: result.tokensIn,
+    tokensOut: result.tokensOut,
+    costUsdDelta: result.costUsd,
+    data: { model, mocked: result.mocked },
+  });
+  saveRun(run);
+  return result.text;
+}

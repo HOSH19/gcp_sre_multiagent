@@ -1,0 +1,23 @@
+{
+  "name": "gcp-sre-agents",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Multi-agent GCP incident response crew for portfolio demos",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @gcp-sre/shared && npm run build -w @gcp-sre/patient -w @gcp-sre/chaos-controller -w @gcp-sre/api -w @gcp-sre/cli -w @gcp-sre/web",
+    "dev:api": "npm run dev -w @gcp-sre/api",
+    "dev:patient": "npm run dev -w @gcp-sre/patient",
+    "dev:chaos": "npm run dev -w @gcp-sre/chaos-controller",
+    "dev:web": "npm run dev -w @gcp-sre/web",
+    "cli": "npm run start -w @gcp-sre/cli --",
+    "eval": "npm run eval -w @gcp-sre/api",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,46 @@
+"use client";
+
+import { SCENARIO_OPTIONS, type ScenarioId } from "@/lib/types";
+import { card, h2 } from "@/lib/styles";
+
+export function InjectPanel(props: {
+  scenario: ScenarioId;
+  busy: boolean;
+  onScenario: (s: ScenarioId) => void;
+  onInject: () => void;
+  onInvestigate: () => void;
+}) {
+  return (
+    <div style={card}>
+      <h2 style={h2}>1. Inject failure</h2>
+      <label style={{ display: "block", marginBottom: 8, color: "var(--muted)" }}>Scenario</label>
+      <select
+        value={props.scenario}
+        onChange={(e) => props.onScenario(e.target.value as ScenarioId)}
+        style={{
+          width: "100%",
+          padding: "0.55rem",
+          borderRadius: 8,
+          border: "1px solid var(--line)",
+          background: "#10161d",
+          color: "var(--text)",
+          marginBottom: 12,
+        }}
+      >
+        {SCENARIO_OPTIONS.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.label}
+          </option>
+        ))}
+      </select>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button disabled={props.busy} onClick={props.onInject}>
+          Inject only
+        </button>
+        <button className="primary" disabled={props.busy} onClick={props.onInvestigate}>
+          Inject + Investigate
+        </button>
+      </div>
+    </div>
+  );
+}

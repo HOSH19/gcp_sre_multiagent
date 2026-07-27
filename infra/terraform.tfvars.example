@@ -1,0 +1,4 @@
+project_id      = "YOUR_GCP_PROJECT_ID"
+region          = "us-central1"
+billing_account = "" # optional: XXXXXX-XXXXXX-XXXXXX for $20/$40 budgets
+chaos_admin_token = "change-me-in-prod"

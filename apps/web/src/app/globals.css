@@ -1,0 +1,73 @@
+:root {
+  --bg: #0f1419;
+  --panel: #171e26;
+  --line: #2a3542;
+  --text: #e7eef6;
+  --muted: #8fa3b8;
+  --accent: #3d9cf0;
+  --good: #3ecf8e;
+  --warn: #f0b429;
+  --bad: #f07178;
+  --font: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #1a2a3d 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #1b2430 0%, transparent 50%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  min-height: 100%;
+}
+
+a {
+  color: var(--accent);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: #1d2733;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #041018;
+  font-weight: 600;
+}
+
+button.good {
+  background: var(--good);
+  border-color: transparent;
+  color: #041018;
+  font-weight: 600;
+}
+
+button.bad {
+  background: transparent;
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mono {
+  font-family: var(--mono);
+}
