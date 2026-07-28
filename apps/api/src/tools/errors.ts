@@ -1,3 +1,5 @@
+import { config } from "../config.js";
+import { queryPatientErrors } from "../gcp/logging.js";
 import { chaosState } from "./chaosClient.js";
 import { evidence } from "./evidence.js";
 
@@ -8,12 +10,31 @@ const ERRORS: Record<string, Array<{ message: string; count: number }>> = {
 };
 
 export async function listRecentErrors() {
+  if (config.mode === "gcp") {
+    try {
+      const errors = await queryPatientErrors(40);
+      return evidence(
+        "listRecentErrors",
+        `Error groups: ${errors.map((e) => `${e.message} (n=${e.count})`).join("; ")}`,
+        { errors, source: "cloud_logging" },
+      );
+    } catch (err) {
+      const state = await chaosState();
+      const errors = ERRORS[state.activeScenario ?? ""] ?? [{ message: "No recent error groups", count: 0 }];
+      return evidence("listRecentErrors", `Cloud Logging errors unavailable; fallback (${String(err)})`, {
+        errors,
+        source: "fallback",
+        error: String(err),
+      });
+    }
+  }
+
   const state = await chaosState();
   const errors = ERRORS[state.activeScenario ?? ""] ?? [{ message: "No recent error groups", count: 0 }];
   return evidence(
     "listRecentErrors",
     `Error groups: ${errors.map((e) => `${e.message} (n=${e.count})`).join("; ")}`,
-    { errors },
+    { errors, source: "canned" },
   );
 }
 
@@ -28,5 +49,6 @@ export async function getUptimeCheckState() {
   return evidence("getUptimeCheckState", ok ? "Uptime check passing" : "Uptime check failing", {
     passing: ok,
     derivedFrom: health.id,
+    source: config.mode === "gcp" ? "patient_health" : "patient_health_with_local_overlay",
   });
 }

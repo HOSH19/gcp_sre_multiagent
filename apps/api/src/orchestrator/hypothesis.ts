@@ -1,8 +1,13 @@
 import { newId, type HypothesisItem, type InvestigationRun } from "@gcp-sre/shared";
 
 type HealthRaw = {
-  patient?: { reason?: string };
-  chaosState?: { activeScenario?: string | null; traffic?: Record<string, number> };
+  patient?: { reason?: string; ok?: boolean };
+  chaosState?: {
+    activeScenario?: string | null;
+    traffic?: Record<string, number>;
+    badRevision?: string;
+    goodRevision?: string;
+  };
 };
 
 function pushHyp(
@@ -23,22 +28,53 @@ export function inferHypotheses(run: InvestigationRun): { hypotheses: Hypothesis
     health?.chaosState?.traffic ??
     {};
   const env = run.evidence.find((e) => e.source === "getServiceEnv")?.raw as { hasAppSecret?: boolean } | undefined;
+  const revisions = run.evidence.find((e) => e.source === "listRevisions")?.raw as
+    | { revisions?: Array<{ name: string; healthy: boolean }> }
+    | undefined;
   const active = health?.chaosState?.activeScenario ?? null;
+  const badRevision =
+    health?.chaosState?.badRevision ??
+    revisions?.revisions?.find((r) => !r.healthy)?.name ??
+    undefined;
+
   const badPct = Object.entries(traffic)
-    .filter(([n]) => n.includes("bad"))
+    .filter(([n]) => (badRevision ? n === badRevision || n.endsWith(`/${badRevision}`) : n.includes("bad")))
     .reduce((s, [, p]) => s + p, 0);
+
+  const unhealthyServing =
+    health?.patient?.reason === "unhealthy_revision" ||
+    (badPct > 0 && health?.patient?.ok === false);
 
   const hypotheses: HypothesisItem[] = [];
   const ids = (...sources: string[]) => run.evidence.filter((e) => sources.includes(e.source)).map((e) => e.id);
 
-  if (active === "missing_config" || health?.patient?.reason === "missing_required_env" || env?.hasAppSecret === false) {
-    pushHyp(hypotheses, "missing_required_env", 0.92, "Required APP_SECRET env is missing.", ids("getServiceEnv", "getServiceHealth"));
+  // Prefer tool/patient evidence; keep activeScenario as eval-compatible fallback for local overlay mode.
+  if (health?.patient?.reason === "missing_required_env" || env?.hasAppSecret === false || active === "missing_config") {
+    pushHyp(
+      hypotheses,
+      "missing_required_env",
+      health?.patient?.reason === "missing_required_env" || env?.hasAppSecret === false ? 0.94 : 0.88,
+      "Required APP_SECRET env is missing.",
+      ids("getServiceEnv", "getServiceHealth"),
+    );
   }
-  if (active === "bad_revision_traffic" || health?.patient?.reason === "unhealthy_revision" || badPct > 0) {
-    pushHyp(hypotheses, "unhealthy_revision_receiving_traffic", 0.9, "Unhealthy revision is receiving traffic.", ids("getRevisionTraffic", "listRevisions"));
+  if (unhealthyServing || active === "bad_revision_traffic" || badPct > 0) {
+    pushHyp(
+      hypotheses,
+      "unhealthy_revision_receiving_traffic",
+      unhealthyServing || badPct > 0 ? 0.93 : 0.86,
+      "Unhealthy revision is receiving traffic.",
+      ids("getRevisionTraffic", "listRevisions", "getServiceHealth"),
+    );
   }
-  if (active === "http_500s" || health?.patient?.reason === "chaos_force_500") {
-    pushHyp(hypotheses, "application_exception_500", 0.91, "Application returning forced HTTP 500s.", ids("queryLogs", "listRecentErrors", "getServiceHealth"));
+  if (health?.patient?.reason === "chaos_force_500" || active === "http_500s") {
+    pushHyp(
+      hypotheses,
+      "application_exception_500",
+      health?.patient?.reason === "chaos_force_500" ? 0.94 : 0.87,
+      "Application returning forced HTTP 500s.",
+      ids("queryLogs", "listRecentErrors", "getServiceHealth"),
+    );
   }
 
   hypotheses.sort((a, b) => b.confidence - a.confidence);

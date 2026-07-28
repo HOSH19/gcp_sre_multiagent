@@ -1,13 +1,15 @@
 import type { InvestigationRun, RemediationProposal } from "@gcp-sre/shared";
+import { config } from "../config.js";
 import { chaosFetch } from "./chaosClient.js";
 
 export function proposeRemediation(run: InvestigationRun): RemediationProposal {
   const top = run.hypotheses[0]?.rootCauseLabel;
+  const secretValue = process.env.APP_SECRET ?? (config.mode === "gcp" ? "deployed-secret" : "local-secret");
   if (top === "missing_required_env") {
     return {
       summary: "Restore missing APP_SECRET env var on the patient service",
       risk: "Low — config restore; brief restart possible",
-      actions: [{ type: "patch_env", reason: "Required configuration missing", details: { APP_SECRET: "local-secret" } }],
+      actions: [{ type: "patch_env", reason: "Required configuration missing", details: { APP_SECRET: secretValue } }],
     };
   }
   if (top === "unhealthy_revision_receiving_traffic") {

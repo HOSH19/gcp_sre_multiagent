@@ -31,22 +31,35 @@ Demo project: **`sre-multiagent`**, region **`us-central1`**.
 
 ```mermaid
 flowchart TB
-  mon[Cloud Monitoring] -->|alert| pub[Pub/Sub sre-incidents]
-  pub -->|push /hooks/pubsub| api[Cloud Run api]
-  web[Cloud Run web] -->|BFF| api
-  api --> vertex[Vertex AI / Gemini]
-  api --> chaos[chaos-controller]
-  chaos --> patient[patient]
-  api --> patient
 
-  cb[Cloud Build] --> ar[Artifact Registry]
-  ar -.->|images| api & chaos & patient & web
-  sm[Secret Manager] -.-> api
-  iam[IAM] -.-> api
-  stub[Firestore / BigQuery stubs] -.-> api
+  subgraph row1[" "]
+    direction LR
+    cb["Cloud Build<br/>CI deploy"] --> ar["Artifact Registry<br/>images"] --> run["Cloud Run<br/>patient · chaos · api · web"]
+  end
+
+  subgraph row2[" "]
+    direction LR
+    mon["Cloud Monitoring<br/>alerts"] --> pub["Pub/Sub<br/>sre-incidents"] --> api["api<br/>/hooks/pubsub"]
+  end
+
+  subgraph row3[" "]
+    direction LR
+    vertex["Vertex AI<br/>Gemini"] & sm["Secret Manager"] & iam["IAM"]
+  end
+
+  subgraph row4[" "]
+    direction LR
+    stub["Firestore / BigQuery<br/>stubs"]
+  end
+
+  web["web<br/>BFF UI"] --> api
+  api --> vertex
+  sm -.-> api
+  iam -.-> api
+  stub -.-> api
 ```
 
-Cloud Run services scale to zero by default. Agent tools hit the patient health endpoint and **chaos-controller** for scenario state and allowlisted remediations (rollback traffic / patch env).
+Cloud Run services scale to zero by default. In **MODE=gcp**, chaos-controller mutates the real patient service (traffic split / env patch via Cloud Run Admin API; `/chaos/500` for forced 500s). API tools read **Cloud Logging** and **Cloud Run** state; health checks hit the real patient `/health` (no local chaos overlay). In **MODE=local**, chaos stays in-memory and API tools use canned/overlay behavior for offline eval.
 
 ### Open the UI
 
@@ -55,6 +68,24 @@ gcloud run services proxy web --project=sre-multiagent --region=us-central1 --po
 ```
 
 Then open **http://127.0.0.1:8080**.
+
+### Deploy / verify real GCP chaos
+
+```bash
+# Full rebuild + deploy (patient good+bad revisions, chaos, api) + IAM
+./scripts/deploy-cloud-run.sh
+
+# Or only refresh the bad revision pins after patient changes
+./scripts/deploy-patient-bad-revision.sh
+
+# Local smoke against live patient (ADC required)
+export PATIENT_SERVICE_URL="$(gcloud run services describe patient --region=us-central1 --format='value(status.url)')"
+MODE=gcp GCP_PROJECT_ID=sre-multiagent GCP_REGION=us-central1 PATIENT_SERVICE_NAME=patient \
+  GOOD_REVISION=... BAD_REVISION=... APP_SECRET=deployed-secret PATIENT_SERVICE_URL="$PATIENT_SERVICE_URL" \
+  npx tsx scripts/verify-gcp-chaos.mts
+```
+
+Local eval (in-memory chaos, no GCP): keep `MODE=local` and run `npm run eval`.
 
 ## GitHub Actions / CI/CD
 

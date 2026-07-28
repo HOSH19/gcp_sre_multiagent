@@ -1,17 +1,17 @@
 import { Hono } from "hono";
 import type { ScenarioId } from "@gcp-sre/shared";
 import { isAuthed } from "./auth.js";
-import { localState, MODE, PATIENT_SERVICE_URL } from "./config.js";
+import { isGcpMode, localState, MODE, PATIENT_SERVICE_URL } from "./config.js";
 import { injectScenario, patchEnv, resetAll, rollbackTraffic } from "./scenarios.js";
 
 const VALID: ScenarioId[] = ["http_500s", "missing_config", "bad_revision_traffic"];
 
 export function registerRoutes(app: Hono): void {
-  app.get("/health", (c) => c.json({ ok: true, service: "chaos-controller", mode: MODE }));
+  app.get("/health", (c) => c.json({ ok: true, service: "chaos-controller", mode: MODE, gcp: isGcpMode }));
 
   app.get("/state", (c) => {
     if (!isAuthed((n) => c.req.header(n))) return c.json({ error: "unauthorized" }, 401);
-    return c.json({ mode: MODE, ...localState, patientServiceUrl: PATIENT_SERVICE_URL });
+    return c.json({ mode: MODE, gcp: isGcpMode, ...localState, patientServiceUrl: PATIENT_SERVICE_URL });
   });
 
   app.post("/inject/:scenario", async (c) => {
@@ -27,14 +27,23 @@ export function registerRoutes(app: Hono): void {
     return c.json({ ok: true, result: await resetAll() });
   });
 
-  app.post("/remediate/rollback", (c) => {
+  app.post("/remediate/rollback", async (c) => {
     if (!isAuthed((n) => c.req.header(n))) return c.json({ error: "unauthorized" }, 401);
-    return c.json({ ok: true, traffic: rollbackTraffic() });
+    try {
+      const traffic = await rollbackTraffic();
+      return c.json({ ok: true, traffic });
+    } catch (err) {
+      return c.json({ ok: false, error: String(err) }, 502);
+    }
   });
 
   app.post("/remediate/patch-env", async (c) => {
     if (!isAuthed((n) => c.req.header(n))) return c.json({ error: "unauthorized" }, 401);
-    const body = await c.req.json().catch(() => ({} as Record<string, string>));
-    return c.json({ ok: true, env: patchEnv(body) });
+    try {
+      const body = await c.req.json().catch(() => ({} as Record<string, string>));
+      return c.json({ ok: true, env: await patchEnv(body) });
+    } catch (err) {
+      return c.json({ ok: false, error: String(err) }, 502);
+    }
   });
 }

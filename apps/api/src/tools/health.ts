@@ -14,6 +14,7 @@ async function fetchPatient(): Promise<PatientHealth> {
   }
 }
 
+/** Local/dev only: chaos-controller in-memory state does not mutate the patient process. */
 function applyChaosOverlay(patient: PatientHealth, state: Awaited<ReturnType<typeof chaosState>>): PatientHealth {
   if (state.activeScenario === "missing_config" && !state.env?.APP_SECRET) {
     return { ok: false, reason: "missing_required_env", status: 503, revision: patient.revision };
@@ -29,13 +30,27 @@ function applyChaosOverlay(patient: PatientHealth, state: Awaited<ReturnType<typ
 
 export async function getServiceHealth() {
   const state = await chaosState();
-  const patient = applyChaosOverlay(await fetchPatient(), state);
+  const patientRaw = await fetchPatient();
+  const patient = config.mode === "gcp" ? patientRaw : applyChaosOverlay(patientRaw, state);
   const summary = patient.ok
     ? `Patient healthy (revision=${patient.revision ?? "unknown"})`
     : `Patient unhealthy: ${patient.reason ?? "unknown"} (HTTP ${patient.status})`;
-  return evidence("getServiceHealth", summary, { patient, chaosState: state });
+  return evidence("getServiceHealth", summary, { patient, chaosState: state, mode: config.mode });
 }
 
+/** Post-remediation health: in GCP, poll briefly while Cloud Run traffic/env settles. */
 export async function verifyHealth() {
-  return getServiceHealth();
+  if (config.mode !== "gcp") return getServiceHealth();
+
+  const state = await chaosState();
+  let patient = await fetchPatient();
+  for (let i = 0; i < 8; i++) {
+    if (patient.ok) break;
+    await new Promise((r) => setTimeout(r, 2000));
+    patient = await fetchPatient();
+  }
+  const summary = patient.ok
+    ? `Patient healthy (revision=${patient.revision ?? "unknown"})`
+    : `Patient unhealthy: ${patient.reason ?? "unknown"} (HTTP ${patient.status})`;
+  return evidence("verifyHealth", summary, { patient, chaosState: state, mode: config.mode });
 }
