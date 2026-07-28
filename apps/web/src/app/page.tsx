@@ -4,6 +4,7 @@ import { ApprovalPanel } from "@/components/ApprovalPanel";
 import { Header } from "@/components/Header";
 import { InjectPanel } from "@/components/InjectPanel";
 import { SidePanel } from "@/components/SidePanel";
+import { SoakPanel } from "@/components/SoakPanel";
 import { StatusBanner } from "@/components/StatusBanner";
 import { Timeline } from "@/components/Timeline";
 import { useConsole } from "@/hooks/useConsole";
@@ -24,24 +25,30 @@ export default function HomePage() {
       >
         <InjectPanel
           scenario={c.scenario}
-          busy={c.busy}
+          busy={c.locked}
           onScenario={c.setScenario}
           onInject={c.inject}
           onInvestigate={c.investigate}
         />
         <ApprovalPanel
-          busy={c.busy}
-          canDecide={c.run?.status === "awaiting_approval"}
+          busy={c.locked || c.soakRunning}
+          canDecide={c.run?.status === "awaiting_approval" && !c.soakRunning}
           onApprove={c.approve}
           onDeny={c.deny}
         />
+        <SoakPanel soak={c.soak} locked={c.locked} onStart={c.startSoak} />
       </section>
       {c.error && (
         <p style={{ color: "var(--bad)", marginBottom: "1rem" }} className="mono">
           {c.error}
-          {c.error.includes("already active")
-            ? " — Approve or Deny the current run first (only 1 concurrent investigation)."
+          {c.error.includes("already active") || c.error.includes("already running")
+            ? " — Wait for the current investigation or soak to finish (only 1 concurrent)."
             : ""}
+        </p>
+      )}
+      {c.soakRunning && (
+        <p style={{ color: "var(--warn)", marginBottom: "1rem", fontSize: 14 }}>
+          Soak in progress — remediation is auto-approved for each scenario.
         </p>
       )}
       {c.run && <StatusBanner run={c.run} />}

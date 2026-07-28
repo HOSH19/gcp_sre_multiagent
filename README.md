@@ -69,6 +69,10 @@ gcloud run services proxy web --project=sre-multiagent --region=us-central1 --po
 
 Then open **http://127.0.0.1:8080**.
 
+From the console you can inject a single scenario, investigate with a human approval gate, or run **Scenario soak** (“Run all scenarios”) — sequential eval of all three scenarios with auto-approved remediation (same effectiveness check as CLI). Caps still apply per run. Locally you can still run `npm run eval`.
+
+Soak state is **in-memory** on the api instance (max concurrent = 1). Check `GET /soak` or `/health` (`activeSoakId`). Clear a stuck lock with `POST /soak/cancel`, or redeploy/restart the api service (cold start wipes memory).
+
 ### Deploy / verify real GCP chaos
 
 ```bash

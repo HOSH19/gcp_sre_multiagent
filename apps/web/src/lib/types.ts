@@ -46,6 +46,36 @@ export interface Run {
   error?: string;
 }
 
+export type SoakScenarioPhase = "pending" | "running" | "passed" | "failed";
+
+export interface SoakScenarioResult {
+  scenario: ScenarioId;
+  phase: SoakScenarioPhase;
+  ok?: boolean;
+  matched?: boolean;
+  healthy?: boolean;
+  predicted?: string;
+  expected?: string;
+  costUsd?: number;
+  runId?: string;
+  reason?: string;
+}
+
+export interface SoakJob {
+  id: string;
+  status: "queued" | "running" | "completed" | "failed";
+  createdAt: string;
+  updatedAt: string;
+  autoApprove: true;
+  currentScenario: ScenarioId | null;
+  currentRunId: string | null;
+  results: SoakScenarioResult[];
+  passed: number;
+  total: number;
+  totalCostUsd: number;
+  error?: string;
+}
+
 export const SCENARIO_OPTIONS: { id: ScenarioId; label: string }[] = [
   { id: "http_500s", label: "HTTP 500s" },
   { id: "missing_config", label: "Missing config" },
