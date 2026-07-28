@@ -4,13 +4,38 @@ export const CHAOS_TOKEN = process.env.NEXT_PUBLIC_CHAOS_TOKEN ?? "dev-chaos-tok
 
 export type ScenarioId = "http_500s" | "missing_config" | "bad_revision_traffic";
 
+export interface AgentEvent {
+  id: string;
+  agent: string;
+  type: string;
+  message: string;
+  at: string;
+  data?: {
+    tool?: string;
+    model?: string;
+    mocked?: boolean;
+    summary?: string;
+    source?: string;
+    raw?: unknown;
+    hypotheses?: unknown;
+    [key: string]: unknown;
+  };
+  tokensIn?: number;
+  tokensOut?: number;
+  costUsdDelta?: number;
+}
+
 export interface Run {
   id: string;
   status: string;
   scenario?: ScenarioId;
-  events: Array<{ id: string; agent: string; type: string; message: string; at: string }>;
+  events: AgentEvent[];
   hypotheses: Array<{ rootCauseLabel: string; confidence: number; summary: string }>;
-  proposedRemediation: { summary: string; risk: string; actions: unknown[] } | null;
+  proposedRemediation: {
+    summary: string;
+    risk: string;
+    actions: Array<{ type: string; reason: string; details?: Record<string, string> }>;
+  } | null;
   report: {
     eval?: { matched: boolean; expected: string; predicted: string };
     healthAfter?: { ok: boolean; detail: string };

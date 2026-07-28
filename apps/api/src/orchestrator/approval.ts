@@ -20,6 +20,18 @@ async function executeActions(run: InvestigationRun): Promise<void> {
   }
 }
 
+async function executeApprovedRemediation(run: InvestigationRun): Promise<InvestigationRun> {
+  appendEvent(run.id, { agent: "mitigator", type: "status", message: "Approval granted — executing remediation" });
+  await executeActions(run);
+  const health = await verifyHealth();
+  run.evidence.push(health);
+  appendEvent(run.id, { agent: "mitigator", type: "tool_result", message: "verifyHealth", data: health });
+  await finalizeWithScribe(run, "approved", run.proposedRemediation?.actions);
+  releaseLock(run.id);
+  return run;
+}
+
+/** Full sync path — used by eval harness. */
 export async function resolveApproval(runId: string, decision: "approved" | "denied"): Promise<InvestigationRun> {
   const run = getRun(runId);
   if (!run) throw new Error("run not found");
@@ -34,12 +46,39 @@ export async function resolveApproval(runId: string, decision: "approved" | "den
 
   run.status = "remediating";
   saveRun(run);
-  appendEvent(run.id, { agent: "mitigator", type: "status", message: "Approval granted — executing remediation" });
-  await executeActions(run);
-  const health = await verifyHealth();
-  run.evidence.push(health);
-  appendEvent(run.id, { agent: "mitigator", type: "tool_result", message: "verifyHealth", data: health });
-  await finalizeWithScribe(run, "approved", run.proposedRemediation?.actions);
-  releaseLock(runId);
+  return executeApprovedRemediation(run);
+}
+
+/**
+ * Kick off approval work and return immediately (approve) so the UI can poll.
+ * Deny still completes synchronously — it's fast.
+ */
+export function queueApproval(runId: string, decision: "approved" | "denied"): InvestigationRun {
+  const run = getRun(runId);
+  if (!run) throw new Error("run not found");
+  if (run.status !== "awaiting_approval") throw new Error(`run is not awaiting approval (status=${run.status})`);
+
+  if (decision === "denied") {
+    run.status = "denied";
+    saveRun(run);
+    void finalizeWithScribe(run, "denied")
+      .then(() => releaseLock(runId))
+      .catch((err) => console.error(`[deny] ${runId}:`, err));
+    return run;
+  }
+
+  run.status = "remediating";
+  saveRun(run);
+  void executeApprovedRemediation(run).catch((err) => {
+    const current = getRun(runId);
+    if (current) {
+      current.status = "failed";
+      current.error = err instanceof Error ? err.message : String(err);
+      appendEvent(runId, { agent: "orchestrator", type: "error", message: current.error });
+      saveRun(current);
+      releaseLock(runId);
+    }
+    console.error(`[approve] ${runId}:`, err);
+  });
   return run;
 }

@@ -8,7 +8,7 @@ export const config = {
   patientServiceName: process.env.PATIENT_SERVICE_NAME ?? "patient",
   chaosControllerUrl: process.env.CHAOS_CONTROLLER_URL ?? "http://127.0.0.1:8082",
   chaosAdminToken: process.env.CHAOS_ADMIN_TOKEN ?? "dev-chaos-token",
-  flashLiteModel: process.env.GEMINI_FLASH_LITE_MODEL ?? "gemini-2.0-flash-lite",
-  flashModel: process.env.GEMINI_FLASH_MODEL ?? "gemini-2.0-flash",
+  flashLiteModel: process.env.GEMINI_FLASH_LITE_MODEL ?? "gemini-2.5-flash-lite",
+  flashModel: process.env.GEMINI_FLASH_MODEL ?? "gemini-2.5-flash",
   vertexLocation: process.env.VERTEX_LOCATION ?? "us-central1",
 };

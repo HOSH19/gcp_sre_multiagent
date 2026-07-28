@@ -1,3 +1,3 @@
 export { startInvestigation } from "./investigate.js";
-export { resolveApproval } from "./approval.js";
-export { injectAndInvestigate } from "./inject.js";
+export { resolveApproval, queueApproval } from "./approval.js";
+export { injectAndInvestigate, injectAndQueueInvestigation } from "./inject.js";
