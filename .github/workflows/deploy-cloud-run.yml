@@ -1,0 +1,69 @@
+# Manual Cloud Run deploy only — does not run on PR/push.
+#
+# Requires GCP Workload Identity Federation. Configure these GitHub secrets
+# before dispatching:
+#   GCP_WORKLOAD_IDENTITY_PROVIDER  e.g. projects/123/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
+#   GCP_SERVICE_ACCOUNT             e.g. github-deploy@PROJECT.iam.gserviceaccount.com
+# Optional:
+#   GCP_PROJECT_ID                  defaults to sre-multiagent via deploy scripts if unset
+#
+# The deploy SA needs Cloud Run Admin, Artifact Registry Writer, Cloud Build Editor,
+# Secret Manager access, and IAM to bind run.invoker as used by scripts/deploy-*.sh.
+
+name: Deploy Cloud Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_build:
+        description: "Set to 1 to skip Cloud Build image builds (SKIP_BUILD=1)"
+        required: false
+        default: "0"
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy patient / chaos / api / web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require GCP WIF secrets
+        env:
+          WIF: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          SA: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$WIF" ] || [ -z "$SA" ]; then
+            echo "::error::Missing secrets.GCP_WORKLOAD_IDENTITY_PROVIDER and/or secrets.GCP_SERVICE_ACCOUNT."
+            echo "Set up Workload Identity Federation and add those secrets before dispatching this workflow."
+            exit 1
+          fi
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy API stack (patient, chaos-controller, api)
+        env:
+          SKIP_BUILD: ${{ inputs.skip_build }}
+        run: |
+          # Optional override — scripts default PROJECT=sre-multiagent when unset.
+          if [ -n "${{ secrets.GCP_PROJECT_ID }}" ]; then
+            export PROJECT="${{ secrets.GCP_PROJECT_ID }}"
+          fi
+          bash scripts/deploy-cloud-run.sh
+
+      - name: Deploy web console
+        run: |
+          if [ -n "${{ secrets.GCP_PROJECT_ID }}" ]; then
+            export PROJECT="${{ secrets.GCP_PROJECT_ID }}"
+          fi
+          bash scripts/deploy-web.sh
