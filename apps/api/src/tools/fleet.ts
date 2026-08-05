@@ -14,7 +14,6 @@ export async function listCloudRunServices(_ctx?: ToolCallContext) {
 
   if (config.mode === "gcp") {
     try {
-      // Group registry entries by project/region to minimize API calls.
       const regions = new Map<string, { projectId: string; region: string }>();
       for (const s of registry.services) {
         regions.set(`${s.projectId}/${s.region}`, { projectId: s.projectId, region: s.region });

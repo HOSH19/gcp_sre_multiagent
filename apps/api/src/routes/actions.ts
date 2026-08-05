@@ -31,9 +31,7 @@ export function registerActionRoutes(app: Hono): void {
         }),
     );
     try {
-      // Chaos inject only for demo scenarios on the patient lab (default when inject≠false).
       if (body.scenario && body.inject !== false && !body.targetService) {
-        // Return immediately so the web UI can poll live timeline events.
         return c.json({
           run: await injectAndQueueInvestigation({ scenario: body.scenario, trigger: "manual" }),
         });

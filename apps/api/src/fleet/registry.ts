@@ -134,11 +134,6 @@ export async function loadServiceRegistry(opts?: { force?: boolean }): Promise<S
   return registry;
 }
 
-/** Clear in-process registry cache (tests / after admin updates). */
-export function clearServiceRegistryCache(): void {
-  cached = null;
-}
-
 export function serviceKey(entry: Pick<ServiceRegistryEntry, "projectId" | "region" | "name">): string {
   return `${entry.projectId}/${entry.region}/${entry.name}`;
 }
@@ -159,18 +154,7 @@ export async function findRegistryService(opts: {
   );
   if (exact) return exact;
 
-  // Fall back to name-only match within the same project when region omitted / differs.
   return registry.services.find((s) => s.name === name && s.projectId === projectId);
-}
-
-export async function isChaosLabService(name: string, projectId?: string, region?: string): Promise<boolean> {
-  const entry = await findRegistryService({ name, projectId, region });
-  if (entry?.chaosLab) return true;
-  return (
-    name === config.patientServiceName &&
-    (projectId ?? config.projectId) === config.projectId &&
-    (region ?? config.region) === config.region
-  );
 }
 
 /** Resolve a registry entry for an investigation run (falls back to patient). */

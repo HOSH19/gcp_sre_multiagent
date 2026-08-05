@@ -85,7 +85,6 @@ function firstCompleteSentence(text: string, max = 160): string | null {
     .trim();
   if (!cleaned) return null;
 
-  // Long markdown / report-style thoughts are not good as summaries.
   if (/^(allowlisted|action:|incident summary|root cause|rationale|expected outcome)/i.test(cleaned)) {
     return null;
   }
@@ -101,7 +100,6 @@ function summarizeThought(agent: string, message: string): string {
   const asJson = tryParseJson(message);
   if (asJson) return summarizeJson(asJson);
 
-  // Prefer a short agent-native label for verbose remediation essays.
   if (agent === "mitigator") {
     const lower = message.toLowerCase();
     if (lower.includes("rollback")) return "Proposing rollback to the last healthy revision";
@@ -156,7 +154,6 @@ export function eventDetails(event: AgentEvent): { kind: "json" | "text"; value:
         value: JSON.stringify({ thought: asJson, meta: sanitizeData(event.data) }, null, 2),
       };
     }
-    // Always put the full LLM thought behind Details — never truncate it in the row.
     const meta = sanitizeData(event.data);
     if (meta && Object.keys(meta).length > 0) {
       return {

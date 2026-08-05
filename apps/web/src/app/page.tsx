@@ -26,7 +26,6 @@ export default function HomePage() {
           scenario={c.scenario}
           busy={c.locked}
           onScenario={c.setScenario}
-          onInject={c.inject}
           onInvestigate={c.investigate}
         />
         <SoakPanel soak={c.soak} locked={c.locked} onStart={c.startSoak} />

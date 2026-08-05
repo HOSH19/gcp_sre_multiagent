@@ -80,7 +80,6 @@ export async function queueApproval(runId: string, decision: "approved" | "denie
   if (decision === "denied") {
     run.status = "denied";
     await saveRun(run);
-    // Release immediately so the next investigate isn't blocked while Scribe finishes.
     await releaseLock(runId);
     void finalizeWithScribe(run, "denied").catch((err) => console.error(`[deny] ${runId}:`, err));
     return run;

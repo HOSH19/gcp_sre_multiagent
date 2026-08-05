@@ -1,3 +1,4 @@
+import type { ScenarioId } from "@gcp-sre/shared";
 import { config } from "../config.js";
 
 async function identityToken(audience: string): Promise<string | null> {
@@ -16,8 +17,6 @@ async function identityToken(audience: string): Promise<string | null> {
 }
 
 export async function chaosFetch(path: string, init?: RequestInit) {
-  // CHAOS_ADMIN_TOKEN is operator-only (inject / chaos-controller). Never add chaos*
-  // handlers to toolHandlers / AGENT_TOOLS — the LLM must not see or call this surface.
   const base = config.chaosControllerUrl.replace(/\/$/, "");
   const token = await identityToken(base);
   const headers: Record<string, string> = {
@@ -30,6 +29,14 @@ export async function chaosFetch(path: string, init?: RequestInit) {
   const res = await fetch(`${base}${path}`, { ...init, headers });
   const body = await res.json().catch(() => ({}));
   return { status: res.status, body };
+}
+
+export async function injectChaosScenario(scenario: ScenarioId): Promise<void> {
+  const res = await chaosFetch(`/inject/${scenario}`, { method: "POST" });
+  const body = res.body as { ok?: boolean; error?: string };
+  if (body.ok !== true) {
+    throw new Error(`chaos inject failed: ${res.status} ${JSON.stringify(res.body)}`);
+  }
 }
 
 export async function chaosState() {

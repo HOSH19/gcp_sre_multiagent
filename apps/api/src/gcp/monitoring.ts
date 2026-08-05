@@ -141,7 +141,6 @@ export async function resolveUptimeCheckConfig(serviceUrl?: string): Promise<Upt
   } catch {
     pathHint = undefined;
   }
-  // Health URL often ends with /health; uptime check path is typically /health
   if (!pathHint || pathHint === "/") pathHint = "/health";
 
   const configs = await listUptimeCheckConfigs();
@@ -155,7 +154,6 @@ export async function resolveUptimeCheckConfig(serviceUrl?: string): Promise<Upt
     }
     const cfgPath = c.httpCheck?.path ?? "/";
     if (pathHint && pathHint !== "/" && cfgPath !== "/" && cfgPath !== pathHint) {
-      // Prefer path match but still allow host-only if unique later
       return cfgPath === pathHint || pathHint.endsWith(cfgPath) || cfgPath.endsWith(pathHint);
     }
     return true;

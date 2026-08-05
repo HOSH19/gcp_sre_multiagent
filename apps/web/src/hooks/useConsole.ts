@@ -6,7 +6,6 @@ import {
   fetchApiHealth,
   fetchRun,
   fetchSoak,
-  injectScenario,
   startInvestigate,
   startSoak,
 } from "@/lib/api";
@@ -32,7 +31,6 @@ export function useConsole() {
     void fetchApiHealth().then(setApiHealth);
   }, []);
 
-  // Deep-link from Slack/PagerDuty: /?runId=...
   useEffect(() => {
     if (typeof window === "undefined") return;
     const runId = new URLSearchParams(window.location.search).get("runId");
@@ -42,7 +40,6 @@ export function useConsole() {
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
 
-  // Poll while agents are actively working so the timeline fills in live.
   useEffect(() => {
     if (!run || !LIVE_STATUSES.has(run.status)) return;
     const t = setInterval(() => {
@@ -53,7 +50,6 @@ export function useConsole() {
     return () => clearInterval(t);
   }, [run?.id, run?.status]);
 
-  // Keep polling while awaiting approval so operators following a deep-link see updates.
   useEffect(() => {
     if (!run || run.status !== "awaiting_approval") return;
     const t = setInterval(() => {
@@ -64,7 +60,6 @@ export function useConsole() {
     return () => clearInterval(t);
   }, [run?.id, run?.status]);
 
-  // Poll soak job while sequential scenarios run.
   useEffect(() => {
     if (!soak || !SOAK_LIVE.has(soak.status)) return;
     const t = setInterval(() => {
@@ -112,7 +107,6 @@ export function useConsole() {
     soakRunning,
     error,
     apiHealth,
-    inject: () => void wrap(async () => injectScenario(scenario)),
     investigate: () =>
       void wrap(async () => {
         const next = await startInvestigate(scenario);

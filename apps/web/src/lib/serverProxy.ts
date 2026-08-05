@@ -22,8 +22,5 @@ export async function proxyTo(
   const headers = new Headers(init.headers);
   headers.set("content-type", headers.get("content-type") ?? "application/json");
   if (token) headers.set("authorization", `Bearer ${token}`);
-  if (process.env.CHAOS_ADMIN_TOKEN) {
-    headers.set("x-chaos-token", process.env.CHAOS_ADMIN_TOKEN);
-  }
   return fetch(url, { ...init, headers });
 }

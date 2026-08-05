@@ -2,13 +2,18 @@ import type { ScenarioId } from "@gcp-sre/shared";
 import { api } from "../http.js";
 import { usage } from "../usage.js";
 
-export async function cmdInvestigate(args: string[]) {
+function parseInvestigateArgs(args: string[]): { scenario?: ScenarioId; inject: boolean } {
   let scenario: ScenarioId | undefined;
   let inject = true;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--scenario") scenario = args[++i] as ScenarioId;
     if (args[i] === "--no-inject") inject = false;
   }
+  return { scenario, inject };
+}
+
+export async function cmdInvestigate(args: string[]) {
+  const { scenario, inject } = parseInvestigateArgs(args);
   const body = await api("/investigate", { method: "POST", body: JSON.stringify({ scenario, inject }) });
   console.log(`run=${body.run.id} status=${body.run.status}`);
   console.log(`top=${body.run.hypotheses?.[0]?.rootCauseLabel ?? "n/a"}`);

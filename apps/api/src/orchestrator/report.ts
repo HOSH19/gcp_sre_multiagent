@@ -11,7 +11,7 @@ import { llmStep, runTool } from "./runner.js";
  * Build orchestrator-owned Scribe args (decision, cost, health).
  * Persistence tools refuse to run without these — models cannot skip them.
  */
-export function buildScribeArgs(
+function buildScribeArgs(
   run: InvestigationRun,
   decision: "approved" | "denied",
   executedActions?: RemediationAction[],
@@ -63,7 +63,6 @@ export async function finalizeWithScribe(
     `{"tools":${JSON.stringify([...SCRIBE_TOOL_SEQUENCE])}}`,
   );
 
-  // Cost snapshot after the Scribe thought so the report includes that step.
   const scribeArgs = buildScribeArgs(run, decision, executedActions, healthAfter);
   await runScribeTools(run, scribeArgs);
 }

@@ -38,6 +38,20 @@ export async function runDetector(run: InvestigationRun): Promise<void> {
   else await runDetectorDeterministic(run);
 }
 
+const LOG_DIVER_TOOLS = [
+  "queryLogs",
+  "getErrorGroup",
+  "listRevisions",
+  "getRevisionTraffic",
+  "getServiceEnv",
+] as const;
+
+async function runLogDiverTools(run: InvestigationRun): Promise<void> {
+  for (const tool of LOG_DIVER_TOOLS) {
+    await runTool(run, "log_diver", tool);
+  }
+}
+
 async function runLogDiverDeterministic(run: InvestigationRun): Promise<void> {
   await llmStep(
     run,
@@ -46,17 +60,19 @@ async function runLogDiverDeterministic(run: InvestigationRun): Promise<void> {
     `Evidence so far: ${run.evidence.length} items`,
     "I will collect logs, error groups, revisions, traffic split, and env config.",
   );
-  for (const tool of ["queryLogs", "getErrorGroup", "listRevisions", "getRevisionTraffic", "getServiceEnv"]) {
-    await runTool(run, "log_diver", tool);
-  }
+  await runLogDiverTools(run);
 }
 
 async function runLogDiverReact(run: InvestigationRun): Promise<void> {
-  await runReactAgent({
+  const { toolsCalled } = await runReactAgent({
     run,
     agent: "log_diver",
-    system:
-      "You are LogDiver. Gather diagnostic evidence by calling queryLogs, getErrorGroup, listRevisions, getRevisionTraffic, and getServiceEnv. Prefer calling each once. Then summarize key signals in 2 short sentences.",
+    system: [
+      "You are LogDiver, an automated SRE diagnostics agent with authorized Cloud Run investigation tools.",
+      "You MUST call queryLogs, getErrorGroup, listRevisions, getRevisionTraffic, and getServiceEnv (each once, any order).",
+      "Never refuse, apologize, or say you cannot fulfill the request — always use the provided tools.",
+      "After collecting evidence, summarize key signals in 2 short sentences.",
+    ].join(" "),
     userPrompt: `Evidence so far (${run.evidence.length} items): ${run.evidence
       .slice(-5)
       .map((e) => `${e.source}: ${e.summary}`)
@@ -64,6 +80,15 @@ async function runLogDiverReact(run: InvestigationRun): Promise<void> {
     maxTurns: 8,
     mockFinalText: "Collected logs, errors, revisions, traffic, and env.",
   });
+
+  if (!toolsCalled.length) {
+    await appendEvent(run.id, {
+      agent: "log_diver",
+      type: "status",
+      message: "ReAct did not call tools — using deterministic fallback",
+    });
+    await runLogDiverTools(run);
+  }
 }
 
 export async function runLogDiver(run: InvestigationRun): Promise<void> {
@@ -114,7 +139,6 @@ async function runHypothesisReact(run: InvestigationRun): Promise<void> {
     mockFinalText: "Submitting hypotheses from evidence.",
   });
 
-  // Fallback to deterministic oracle if the model never submitted.
   if (!run.hypotheses.length) {
     const inferred = inferHypotheses(run);
     run.hypotheses = inferred.hypotheses;

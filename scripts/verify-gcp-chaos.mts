@@ -7,34 +7,43 @@ async function health() {
   return r.json();
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function runStep(label: string, action: () => Promise<unknown>, waitMs: number) {
+  console.log(`\n=== ${label} ===`);
+  console.log(await action());
+  await sleep(waitMs);
+  console.log(`health after ${label}:`, await health());
+}
+
 async function main() {
   console.log("health before:", await health());
 
-  console.log("\n=== inject bad_revision_traffic ===");
-  const inj = await injectScenario("bad_revision_traffic");
-  console.log(JSON.stringify(inj, null, 2));
-  await new Promise((r) => setTimeout(r, 4000));
-  console.log("health after inject:", await health());
+  await runStep(
+    "inject bad_revision_traffic",
+    () => injectScenario("bad_revision_traffic").then((result) => JSON.stringify(result, null, 2)),
+    4000,
+  );
 
-  console.log("\n=== rollback ===");
-  console.log("traffic:", await rollbackTraffic());
-  await new Promise((r) => setTimeout(r, 4000));
-  console.log("health after rollback:", await health());
+  await runStep("rollback", () => rollbackTraffic().then((traffic) => `traffic: ${JSON.stringify(traffic)}`), 4000);
 
-  console.log("\n=== inject missing_config ===");
-  const mc = await injectScenario("missing_config");
-  console.log(JSON.stringify(mc, null, 2));
-  await new Promise((r) => setTimeout(r, 8000));
-  console.log("health after missing_config:", await health());
+  await runStep(
+    "inject missing_config",
+    () => injectScenario("missing_config").then((result) => JSON.stringify(result, null, 2)),
+    8000,
+  );
 
-  console.log("\n=== patch env APP_SECRET ===");
-  console.log("env:", await patchEnv({ APP_SECRET: "deployed-secret" }));
-  await new Promise((r) => setTimeout(r, 8000));
-  console.log("health after patch:", await health());
+  await runStep(
+    "patch env APP_SECRET",
+    () => patchEnv({ APP_SECRET: "deployed-secret" }).then((env) => `env: ${JSON.stringify(env)}`),
+    8000,
+  );
 
   console.log("\n=== reset ===");
   await resetAll();
-  await new Promise((r) => setTimeout(r, 5000));
+  await sleep(5000);
   console.log("health after reset:", await health());
 }
 

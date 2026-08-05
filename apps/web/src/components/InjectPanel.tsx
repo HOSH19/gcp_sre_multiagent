@@ -7,12 +7,11 @@ export function InjectPanel(props: {
   scenario: ScenarioId;
   busy: boolean;
   onScenario: (s: ScenarioId) => void;
-  onInject: () => void;
   onInvestigate: () => void;
 }) {
   return (
     <div style={card}>
-      <h2 style={h2}>1. Inject failure</h2>
+      <h2 style={h2}>1. Investigate</h2>
       <label style={{ display: "block", marginBottom: 8, color: "var(--muted)" }}>Scenario</label>
       <select
         value={props.scenario}
@@ -33,14 +32,9 @@ export function InjectPanel(props: {
           </option>
         ))}
       </select>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button disabled={props.busy} onClick={props.onInject}>
-          Inject only
-        </button>
-        <button className="primary" disabled={props.busy} onClick={props.onInvestigate}>
-          Inject + Investigate
-        </button>
-      </div>
+      <button className="primary" disabled={props.busy} onClick={props.onInvestigate}>
+        Investigate
+      </button>
     </div>
   );
 }

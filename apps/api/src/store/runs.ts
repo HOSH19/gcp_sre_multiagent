@@ -17,8 +17,6 @@ export async function getRun(id: string): Promise<InvestigationRun | undefined> 
     const fromFs = await firestoreGetRun(id);
     if (fromFs) {
       const cached = runs.get(id);
-      // Prefer in-memory only when this instance is ahead (active writer). Otherwise
-      // always take Firestore so other instances don't serve a stale cached snapshot.
       if (cached && Date.parse(cached.updatedAt) >= Date.parse(fromFs.updatedAt)) {
         return cached;
       }

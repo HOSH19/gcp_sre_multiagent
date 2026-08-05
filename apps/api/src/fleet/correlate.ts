@@ -46,7 +46,6 @@ export async function findActiveRunForTarget(opts: {
     }
   }
 
-  // Fallback: scan recent runs (covers lease lag).
   const runs = await listRuns();
   return runs.find((r) => BUSY.has(r.status) && matchesTarget(r, opts));
 }

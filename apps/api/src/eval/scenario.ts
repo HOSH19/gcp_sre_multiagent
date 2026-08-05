@@ -3,7 +3,7 @@ import { config } from "../config.js";
 import { resolveApproval } from "../orchestrator/approval.js";
 import { startInvestigation } from "../orchestrator/investigate.js";
 import { createRun } from "../store/runs.js";
-import { chaosFetch } from "../tools/chaosClient.js";
+import { injectChaosScenario, chaosFetch } from "../tools/chaosClient.js";
 
 export interface EvalScenarioResult {
   scenario: ScenarioId;
@@ -21,16 +21,6 @@ export async function resetChaos(): Promise<void> {
   await chaosFetch("/reset", { method: "POST" });
 }
 
-async function injectChaos(scenario: ScenarioId): Promise<void> {
-  const res = await chaosFetch(`/inject/${scenario}`, { method: "POST" });
-  // Chaos may return HTTP 502 when the patient is intentionally unhealthy after inject
-  // (e.g. http_500s); trust the JSON `ok` flag.
-  const body = res.body as { ok?: boolean; error?: string };
-  if (body.ok !== true) {
-    throw new Error(`chaos inject failed: ${res.status} ${JSON.stringify(res.body)}`);
-  }
-}
-
 /** Reset → inject → investigate → auto-approve (same effectiveness check as CLI eval). */
 export async function runEvalScenario(
   scenario: ScenarioId,
@@ -38,7 +28,7 @@ export async function runEvalScenario(
 ): Promise<EvalScenarioResult> {
   await resetChaos();
   await new Promise((r) => setTimeout(r, 50));
-  await injectChaos(scenario);
+  await injectChaosScenario(scenario);
 
   const run = await createRun({
     trigger: "eval",

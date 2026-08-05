@@ -34,7 +34,7 @@ export async function generateWithTools(opts: {
       `Vertex function-calling failed for model=${opts.model} (no mock fallback in MODE=gcp)`,
     );
   }
-  // Local / REACT-off paths should not hit this; mock returns text-only (ends the loop).
+
   const prompt = opts.contents.map((c) => c.parts.map((p) => p.text ?? "").join("")).join("\n");
   return mockLlm(opts.model, opts.system, prompt, opts.mockText);
 }

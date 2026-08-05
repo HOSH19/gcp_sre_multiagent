@@ -41,7 +41,6 @@ type MonitoringIncident = {
   resource_type_display_name?: string;
   metric?: { type?: string; displayName?: string };
   documentation?: { content?: string; mime_type?: string };
-  // Demo / eval extension fields
   scenario?: ScenarioId | string;
   service?: string;
   targetService?: string;
@@ -167,11 +166,9 @@ async function resolveService(opts: {
   if (name) {
     const found = await findRegistryService({ name, projectId, region });
     if (found) return found;
-    // Allow investigations for labeled services even if not yet in registry.
     return { projectId, region, name };
   }
 
-  // Try matching condition / summary text against registry service names.
   const registry = await loadServiceRegistry();
   const haystack = [
     conditionLabel(incident ?? undefined),
@@ -188,7 +185,6 @@ async function resolveService(opts: {
     if (match) return match;
   }
 
-  // Default: chaos-lab patient (demo alerts without resource labels).
   const patient = await findRegistryService({
     name: config.patientServiceName,
     projectId: config.projectId,
@@ -208,7 +204,6 @@ export async function mapAlertFromPubSub(
   const attrs = envelope?.message?.attributes;
   const record = asRecord(decoded) as AlertPayload | null;
 
-  // Support both `{ incident: {...} }` wrappers and bare incident objects.
   const incident: MonitoringIncident | undefined =
     record?.incident ??
     (record && (record.incident_id || record.incidentId || record.condition || record.resource)
@@ -230,7 +225,6 @@ export async function mapAlertFromPubSub(
     ],
   );
 
-  // Only attach demo scenarios when targeting the chaos lab patient.
   const chaosLab =
     service.chaosLab === true ||
     (service.name === config.patientServiceName &&

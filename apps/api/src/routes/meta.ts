@@ -6,7 +6,6 @@ import { countActiveLeases, getActiveRunId, getActiveSoakId, listActiveRunIds } 
 
 export function registerMetaRoutes(app: Hono): void {
   app.get("/health", async (c) => {
-    // Durable-store calls can fail if Firestore isn't provisioned yet — keep /health alive.
     let activeRunId: string | null = null;
     let activeRunIds: string[] = [];
     let activeLeaseCount = 0;

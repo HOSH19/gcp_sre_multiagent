@@ -16,7 +16,6 @@ function safeResponsePayload(result: unknown): Record<string, unknown> {
   if (result == null) return { ok: true };
   if (typeof result === "object") {
     try {
-      // Cap size for Vertex functionResponse
       const json = JSON.stringify(result);
       if (json.length > 12_000) {
         return { truncated: true, preview: json.slice(0, 4000) };
@@ -104,7 +103,6 @@ export async function runReactAgent(opts: ReactAgentOpts): Promise<{ text: strin
       return { text: lastText, toolsCalled };
     }
 
-    // Model turn with function calls
     contents.push({
       role: "model",
       parts: calls.map((c) => ({ functionCall: { name: c.name, args: c.args } })),

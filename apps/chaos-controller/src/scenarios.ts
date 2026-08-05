@@ -47,7 +47,6 @@ export async function injectScenario(scenario: ScenarioId) {
     localState.traffic = { [localState.goodRevision]: 100, [localState.badRevision]: 0 };
     localState.env.APP_SECRET = localState.env.APP_SECRET || APP_SECRET_VALUE;
     if (isGcpMode) {
-      // Ensure traffic is on the good revision before force-500; then hit live patient.
       try {
         await shiftToGoodRevision();
       } catch (err) {
@@ -72,7 +71,6 @@ export async function injectScenario(scenario: ScenarioId) {
         });
         localState.env = { ...result.env };
         if (result.latestRevision) {
-          // New misconfigured revision is serving; keep good/bad pins for traffic scenarios.
           syncLocalFromTraffic(trafficMap(result.service));
         }
         return {
@@ -95,18 +93,15 @@ export async function injectScenario(scenario: ScenarioId) {
     };
   }
 
-  // bad_revision_traffic
   await patientChaos("/chaos/reset");
   localState.env.APP_SECRET = localState.env.APP_SECRET || APP_SECRET_VALUE;
 
   if (isGcpMode) {
     try {
-      // Ensure APP_SECRET present on template before shifting to known-bad revision.
       const env = (await getService(cloudRunConfig)).template?.containers?.[0]?.env ?? [];
       const hasSecret = env.some((e) => e.name === "APP_SECRET" && e.value);
       if (!hasSecret) {
         await patchServiceEnv(cloudRunConfig, { APP_SECRET: APP_SECRET_VALUE, IS_BAD_REVISION: null });
-        // After env restore we may have a new good revision — prefer configured GOOD_REVISION pin.
       }
       const result = await shiftToBadRevision();
       return {
@@ -151,7 +146,6 @@ export async function resetAll() {
         IS_BAD_REVISION: null,
         FORCE_500: null,
       });
-      // Prefer pinned good revision if it still exists; otherwise leave LATEST from env patch.
       try {
         await shiftToGoodRevision();
       } catch {
@@ -183,7 +177,6 @@ export async function rollbackTraffic() {
 
 export async function patchEnv(vars: Record<string, string>) {
   const normalized = { ...vars };
-  // Mitigator may send placeholder "local-secret"; restore the deploy-time secret in GCP.
   if (normalized.APP_SECRET && isGcpMode) {
     normalized.APP_SECRET = APP_SECRET_VALUE;
   }

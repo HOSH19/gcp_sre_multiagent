@@ -12,7 +12,7 @@ const BUSY = new Set(["queued", "running", "awaiting_approval", "remediating"]);
  * Enforce MAX_CONCURRENT_PER_SERVICE (default 1) before taking a global lease.
  * Alert correlation attaches repeats; this blocks a second investigation for the same target.
  */
-async function hasPerServiceCapacity(run: InvestigationRun): Promise<boolean> {
+export async function hasPerServiceCapacity(run: InvestigationRun): Promise<boolean> {
   const target = run.targetService || run.patientService;
   if (!target) return true;
 
@@ -37,6 +37,15 @@ async function hasPerServiceCapacity(run: InvestigationRun): Promise<boolean> {
     count += 1;
   }
   return count < config.maxConcurrentPerService;
+}
+
+/** Fail fast before chaos inject so we never mutate the lab when a slot is unavailable. */
+export async function assertInvestigationCapacity(run: InvestigationRun): Promise<void> {
+  if (!(await hasPerServiceCapacity(run))) {
+    throw new Error(
+      `target ${run.targetService ?? run.patientService} already has an active investigation (max per service = ${config.maxConcurrentPerService})`,
+    );
+  }
 }
 
 export async function startInvestigation(runId: string): Promise<InvestigationRun> {

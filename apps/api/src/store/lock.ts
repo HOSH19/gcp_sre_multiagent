@@ -71,13 +71,11 @@ export async function tryAcquireLock(runId: string): Promise<boolean> {
     return true;
   }
 
-  // Memory adapter: honor MAX_CONCURRENT_RUNS across process-local holders.
   if (activeRunIds.has(runId)) {
     addActiveRunId(runId);
     return true;
   }
 
-  // Drop stale holders whose runs finished or disappeared.
   for (const id of [...activeRunIds]) {
     const holder = await getRun(id);
     if (!holder || !BUSY.has(holder.status)) {

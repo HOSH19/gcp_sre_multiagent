@@ -1,4 +1,4 @@
-import { API_URL, CHAOS_TOKEN, CHAOS_URL, type Run, type ScenarioId, type SoakJob } from "./types";
+import { API_URL, type Run, type ScenarioId, type SoakJob } from "./types";
 
 export async function fetchApiHealth(): Promise<string> {
   try {
@@ -12,14 +12,6 @@ export async function fetchApiHealth(): Promise<string> {
 export async function fetchRun(id: string): Promise<Run> {
   const body = await fetch(`${API_URL}/runs/${id}`).then((r) => r.json());
   return body.run as Run;
-}
-
-export async function injectScenario(scenario: ScenarioId): Promise<void> {
-  const res = await fetch(`${CHAOS_URL}/inject/${scenario}`, {
-    method: "POST",
-    headers: { "x-chaos-token": CHAOS_TOKEN },
-  });
-  if (!res.ok) throw new Error(await res.text());
 }
 
 export async function startInvestigate(scenario: ScenarioId): Promise<Run> {

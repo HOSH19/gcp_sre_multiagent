@@ -48,7 +48,6 @@ export function inferHypotheses(run: InvestigationRun): { hypotheses: Hypothesis
   const hypotheses: HypothesisItem[] = [];
   const ids = (...sources: string[]) => run.evidence.filter((e) => sources.includes(e.source)).map((e) => e.id);
 
-  // Prefer tool/patient evidence; keep activeScenario as eval-compatible fallback for local overlay mode.
   if (health?.patient?.reason === "missing_required_env" || env?.hasAppSecret === false || active === "missing_config") {
     pushHyp(
       hypotheses,

@@ -93,7 +93,6 @@ export async function getUptimeCheckState(ctx?: ToolCallContext) {
     }
   }
 
-  // Local/eval: sensible fallback from patient /health (not used as fake Monitoring in gcp).
   const { getServiceHealth } = await import("./health.js");
   const health = await getServiceHealth();
   const ok = Boolean((health.raw as { patient?: { ok?: boolean } })?.patient?.ok);

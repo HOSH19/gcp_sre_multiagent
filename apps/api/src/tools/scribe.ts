@@ -1,5 +1,6 @@
 import {
   SCENARIOS,
+  matchRootCause,
   nowIso,
   type IncidentReport,
   type InvestigationRun,
@@ -70,7 +71,7 @@ export async function writeReport(ctx: ToolCallContext): Promise<unknown> {
     cost,
     healthAfter,
     expectedScenario: run.scenario,
-    eval: expected ? { matched: predicted === expected, expected, predicted } : undefined,
+    eval: expected ? { matched: matchRootCause(predicted, expected), expected, predicted } : undefined,
   };
 
   await setReport(run.id, report);
