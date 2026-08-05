@@ -1,62 +1,69 @@
-import { SCENARIOS, nowIso, type IncidentReport, type InvestigationRun, type RemediationAction } from "@gcp-sre/shared";
-import { config } from "../config.js";
-import { appendEvent, appendTrace, saveRun, setReport, syncRunToFirestore, syncTraceToBigQuery } from "../store/index.js";
+import { nowIso, type InvestigationRun, type RemediationAction } from "@gcp-sre/shared";
+import {
+  SCRIBE_TOOL_SEQUENCE,
+  type ScribeToolArgs,
+} from "../tools/index.js";
 import { modelBreakdown } from "./cost.js";
 import { healthAfterApprove } from "./healthCheck.js";
-import { llmStep } from "./runner.js";
+import { llmStep, runTool } from "./runner.js";
 
-export async function finalizeWithScribe(
+/**
+ * Build orchestrator-owned Scribe args (decision, cost, health).
+ * Persistence tools refuse to run without these — models cannot skip them.
+ */
+export function buildScribeArgs(
   run: InvestigationRun,
   decision: "approved" | "denied",
   executedActions?: RemediationAction[],
-): Promise<void> {
-  await llmStep(run, "scribe", "You are Scribe. Write the final report.", `run=${run.id}`, '{"writeReport":true}');
-
-  const predicted = run.hypotheses[0]?.rootCauseLabel ?? "unknown";
-  const expected = run.scenario ? SCENARIOS[run.scenario].expectedRootCause : undefined;
-  const health = decision === "approved" ? await healthAfterApprove() : undefined;
-
-  const report: IncidentReport = {
-    runId: run.id,
-    timeline: run.events.map((e) => ({ at: e.at, message: e.message, agent: e.agent })),
-    evidence: run.evidence,
-    hypotheses: run.hypotheses,
-    ruledOut: run.ruledOut,
-    proposedRemediation: run.proposedRemediation,
-    approval: { decision, at: nowIso(), executedActions: decision === "approved" ? executedActions : undefined },
+  healthAfter?: { ok: boolean; detail: string },
+): ScribeToolArgs {
+  return {
+    decision,
+    executedActions: decision === "approved" ? executedActions : undefined,
+    healthAfter,
     cost: {
       totalUsd: run.costUsd,
       totalTokensIn: run.tokensIn,
       totalTokensOut: run.tokensOut,
       modelBreakdown: modelBreakdown(run),
     },
-    healthAfter: health,
-    expectedScenario: run.scenario,
-    eval: expected ? { matched: predicted === expected, expected, predicted } : undefined,
   };
+}
 
-  run.toolCallCount += 3;
-  setReport(run.id, report);
-  run.status = decision === "approved" ? "completed" : "denied";
+/**
+ * Invoke Scribe tools in fixed order via runTool.
+ * Persistence order is mandatory (writeReport → writeBigQueryTrace → finalizeRun);
+ * buildScribeArgs remains orchestrator-owned so the model cannot skip decision/cost.
+ */
+export async function runScribeTools(run: InvestigationRun, args: ScribeToolArgs): Promise<void> {
+  const payload = args as unknown as Record<string, unknown>;
+  for (const tool of SCRIBE_TOOL_SEQUENCE) {
+    await runTool(run, "scribe", tool, payload);
+  }
+}
 
-  const traceRow = {
-    runId: run.id,
-    status: run.status,
-    scenario: run.scenario ?? null,
-    predicted,
-    expected: expected ?? null,
-    costUsd: run.costUsd,
-    tokensIn: run.tokensIn,
-    tokensOut: run.tokensOut,
-    project: config.projectId,
-  };
-  await syncTraceToBigQuery(traceRow);
-  appendTrace(traceRow);
-  appendEvent(run.id, {
-    agent: "scribe",
-    type: "status",
-    message: `Report finalized. eval=${report.eval ? `${report.eval.matched}` : "n/a"} cost=$${run.costUsd.toFixed(4)}`,
-  });
-  saveRun(run);
-  await syncRunToFirestore(run);
+export async function finalizeWithScribe(
+  run: InvestigationRun,
+  decision: "approved" | "denied",
+  executedActions?: RemediationAction[],
+): Promise<void> {
+  const healthAfter = decision === "approved" ? await healthAfterApprove() : undefined;
+
+  await llmStep(
+    run,
+    "scribe",
+    "You are Scribe. Finalize the incident by calling writeReport, writeBigQueryTrace, then finalizeRun. Use only the orchestrator-supplied decision, cost, and hypotheses — do not invent them.",
+    [
+      `run=${run.id}`,
+      `decision=${decision}`,
+      `hypotheses=${JSON.stringify(run.hypotheses)}`,
+      `costUsd=${run.costUsd}`,
+      `at=${nowIso()}`,
+    ].join(" "),
+    `{"tools":${JSON.stringify([...SCRIBE_TOOL_SEQUENCE])}}`,
+  );
+
+  // Cost snapshot after the Scribe thought so the report includes that step.
+  const scribeArgs = buildScribeArgs(run, decision, executedActions, healthAfter);
+  await runScribeTools(run, scribeArgs);
 }

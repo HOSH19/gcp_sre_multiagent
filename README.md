@@ -49,14 +49,15 @@ flowchart TB
 
   subgraph row4[" "]
     direction LR
-    stub["Firestore / BigQuery<br/>stubs"]
+    store["Firestore · BigQuery · GCS"]
   end
 
   web["web<br/>BFF UI"] --> api
   api --> vertex
+  api --> page["Slack / PagerDuty"]
   sm -.-> api
   iam -.-> api
-  stub -.-> api
+  store -.-> api
 ```
 
 Cloud Run services scale to zero by default. In **MODE=gcp**, chaos-controller mutates the real patient service (traffic split / env patch via Cloud Run Admin API; `/chaos/500` for forced 500s). API tools read **Cloud Logging** and **Cloud Run** state; health checks hit the real patient `/health` (no local chaos overlay). In **MODE=local**, chaos stays in-memory and API tools use canned/overlay behavior for offline eval.
@@ -71,7 +72,17 @@ Then open **http://127.0.0.1:8080**.
 
 From the console you can inject a single scenario, investigate with a human approval gate, or run **Scenario soak** (“Run all scenarios”) — sequential eval of all three scenarios with auto-approved remediation (same effectiveness check as CLI). Caps still apply per run. Locally you can still run `npm run eval`.
 
-Soak state is **in-memory** on the api instance (max concurrent = 1). Check `GET /soak` or `/health` (`activeSoakId`). Clear a stuck lock with `POST /soak/cancel`, or redeploy/restart the api service (cold start wipes memory).
+In **MODE=gcp**, soak state and investigation leases are **Firestore-backed** (survive multi-instance / cold starts). Locally, soak remains in-process. Check `GET /soak` or `/health` (`activeSoakId`, `activeRunIds`). Clear a stuck soak with `POST /soak/cancel`.
+
+### AuthZ (API / web / chaos)
+
+- **API** and remediation endpoints: Cloud Run IAM (`roles/run.invoker`); do not `--allow-unauthenticated` on `api`.
+- **Web**: optional [IAP](https://cloud.google.com/iap/docs/enabling-cloud-run) on the console, or authenticated proxy (`gcloud run services proxy web`).
+- **Chaos admin token** (`CHAOS_ADMIN_TOKEN`): Secret Manager only; used by the API inject path to call chaos-controller. It is **not** exposed to the LLM tool surface (`AGENT_TOOLS` / ReAct). See [docs/ops.md](docs/ops.md).
+
+### Paging (Slack / PagerDuty)
+
+Set `SLACK_WEBHOOK_URL` and/or `PAGERDUTY_ROUTING_KEY` (Secret Manager → Cloud Run env). Notifications fire on `awaiting_approval` and terminal statuses (`completed` / `denied` / `failed`), with an approval deep-link to `WEB_ORIGIN/?runId=…`. Registry `pagerPolicy` can override PD routing key / severity per service. `MODE=local` keeps paging off unless `PAGING=on`.
 
 ### Deploy / verify real GCP chaos
 

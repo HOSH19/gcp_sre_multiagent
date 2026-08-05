@@ -55,10 +55,12 @@ gcloud run services add-iam-policy-binding web \
   --member="user:${ACCOUNT}" \
   --role="roles/run.invoker" --quiet
 
-# CORS / known origin for API (optional; BFF is same-origin for browser)
+# CORS / known origin for API (optional; BFF is same-origin for browser).
+# Keep --no-cpu-throttling so background inject+investigate survives after HTTP returns.
 gcloud run services update api \
   --project="$PROJECT" --region="$REGION" \
   --update-env-vars="WEB_ORIGIN=${WEB_URL}" \
+  --no-cpu-throttling \
   --quiet
 
 cat <<EOF

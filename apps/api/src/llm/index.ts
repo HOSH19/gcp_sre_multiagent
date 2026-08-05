@@ -1,5 +1,5 @@
-import { callVertex } from "./vertex.js";
-import { mockLlm, type LlmResult } from "./types.js";
+import { callVertex, callVertexWithTools } from "./vertex.js";
+import { mockLlm, type FunctionDeclaration, type LlmContent, type LlmResult } from "./types.js";
 import { config } from "../config.js";
 
 export async function generateText(opts: {
@@ -19,4 +19,24 @@ export async function generateText(opts: {
   return mockLlm(opts.model, opts.system, opts.prompt, opts.mockText);
 }
 
-export type { LlmResult };
+export async function generateWithTools(opts: {
+  model: string;
+  system: string;
+  contents: LlmContent[];
+  tools: FunctionDeclaration[];
+  mockText?: string;
+}): Promise<LlmResult> {
+  const live = await callVertexWithTools(opts);
+  if (live) return live;
+
+  if (config.mode === "gcp") {
+    throw new Error(
+      `Vertex function-calling failed for model=${opts.model} (no mock fallback in MODE=gcp)`,
+    );
+  }
+  // Local / REACT-off paths should not hit this; mock returns text-only (ends the loop).
+  const prompt = opts.contents.map((c) => c.parts.map((p) => p.text ?? "").join("")).join("\n");
+  return mockLlm(opts.model, opts.system, prompt, opts.mockText);
+}
+
+export type { LlmResult, LlmContent, FunctionDeclaration, ContentPart } from "./types.js";

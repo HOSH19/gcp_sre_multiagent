@@ -1,6 +1,7 @@
 import type { ScenarioId } from "../scenarios.js";
 import type { AgentName, RunStatus } from "./agents.js";
 import type { EvidenceItem, HypothesisItem } from "./evidence.js";
+import type { MappedAlert } from "./registry.js";
 import type { RemediationAction, RemediationProposal } from "./remediation.js";
 
 export interface IncidentReport {
@@ -33,7 +34,12 @@ export interface InvestigationRun {
   updatedAt: string;
   trigger: "manual" | "alert" | "cli" | "eval";
   scenario?: ScenarioId;
+  /** @deprecated Prefer targetService; kept for backward compatibility. */
   patientService: string;
+  /** Service under investigation (Cloud Run service name). Defaults to patientService. */
+  targetService: string;
+  projectId?: string;
+  region?: string;
   events: AgentEvent[];
   evidence: EvidenceItem[];
   hypotheses: HypothesisItem[];
@@ -47,6 +53,14 @@ export interface InvestigationRun {
   tokensOut: number;
   error?: string;
   shareUrl?: string;
+  /** GCS URI for finalized report JSON (gs://...). */
+  reportGcsUri?: string;
+  /** Instance that holds the investigation lease. */
+  leaseOwner?: string;
+  /** ISO timestamp when the lease expires. */
+  leaseExpiresAt?: string;
+  /** Structured alert that triggered this run (or latest correlated alert). */
+  alert?: MappedAlert;
 }
 
 export interface AgentEvent {

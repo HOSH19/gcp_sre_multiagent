@@ -41,7 +41,19 @@ const COPY: Record<string, { title: string; detail: string; color: string }> = {
   },
 };
 
-export function StatusBanner({ run }: { run: Run }) {
+export function StatusBanner({
+  run,
+  canDecide = false,
+  busy = false,
+  onApprove,
+  onDeny,
+}: {
+  run: Run;
+  canDecide?: boolean;
+  busy?: boolean;
+  onApprove?: () => void;
+  onDeny?: () => void;
+}) {
   const meta = COPY[run.status] ?? {
     title: run.status,
     detail: "",
@@ -60,6 +72,16 @@ export function StatusBanner({ run }: { run: Run }) {
         {meta.title} · {run.status}
       </div>
       <div style={{ color: "var(--muted)", fontSize: 14 }}>{meta.detail}</div>
+      {canDecide && onApprove && onDeny && (
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <button className="good" disabled={busy} onClick={onApprove}>
+            Approve
+          </button>
+          <button className="bad" disabled={busy} onClick={onDeny}>
+            Deny
+          </button>
+        </div>
+      )}
     </div>
   );
 }

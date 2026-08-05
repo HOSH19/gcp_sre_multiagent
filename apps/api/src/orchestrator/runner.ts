@@ -15,19 +15,29 @@ function modelFor(agent: Specialist): string {
     : config.flashLiteModel;
 }
 
-export async function runTool(run: InvestigationRun, agent: Specialist, tool: string): Promise<unknown> {
+export async function runTool(
+  run: InvestigationRun,
+  agent: Specialist,
+  tool: string,
+  args?: Record<string, unknown>,
+): Promise<unknown> {
   if (!AGENT_TOOLS[agent].includes(tool)) throw new Error(`tool ${tool} not allowed for ${agent}`);
   run.toolCallCount += 1;
   assertCaps(run);
-  appendEvent(run.id, { agent, type: "tool_call", message: `Calling ${tool}`, data: { tool } });
+  await appendEvent(run.id, {
+    agent,
+    type: "tool_call",
+    message: `Calling ${tool}`,
+    data: args ? { tool, args } : { tool },
+  });
 
   const handler = toolHandlers[tool as ToolName];
   if (!handler) throw new Error(`unknown tool ${tool}`);
-  const result = await handler();
+  const result = await handler({ run, args });
 
   if (isEvidence(result)) run.evidence.push(result);
-  appendEvent(run.id, { agent, type: "tool_result", message: `Result from ${tool}`, data: result });
-  saveRun(run);
+  await appendEvent(run.id, { agent, type: "tool_result", message: `Result from ${tool}`, data: result });
+  await saveRun(run);
   await syncRunToFirestore(run);
   return result;
 }
@@ -43,7 +53,7 @@ export async function llmStep(
   run.stepCount += 1;
   const model = modelFor(agent);
   const result = await generateText({ model, system, prompt, mockText });
-  appendEvent(run.id, {
+  await appendEvent(run.id, {
     agent,
     type: "thought",
     message: result.text.slice(0, 2000),
@@ -52,6 +62,6 @@ export async function llmStep(
     costUsdDelta: result.costUsd,
     data: { model, mocked: result.mocked },
   });
-  saveRun(run);
+  await saveRun(run);
   return result.text;
 }

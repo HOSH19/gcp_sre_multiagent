@@ -16,6 +16,8 @@ async function identityToken(audience: string): Promise<string | null> {
 }
 
 export async function chaosFetch(path: string, init?: RequestInit) {
+  // CHAOS_ADMIN_TOKEN is operator-only (inject / chaos-controller). Never add chaos*
+  // handlers to toolHandlers / AGENT_TOOLS — the LLM must not see or call this surface.
   const base = config.chaosControllerUrl.replace(/\/$/, "");
   const token = await identityToken(base);
   const headers: Record<string, string> = {

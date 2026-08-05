@@ -37,6 +37,19 @@ gcloud secrets add-iam-policy-binding chaos-admin-token \
   --member="serviceAccount:${COMPUTE_SA}" \
   --role="roles/secretmanager.secretAccessor" --quiet
 
+# Optional paging secrets (create if missing; mount when versions exist).
+for SECRET in slack-webhook-url pagerduty-routing-key; do
+  gcloud secrets describe "$SECRET" --project="$PROJECT" >/dev/null 2>&1 || \
+    gcloud secrets create "$SECRET" --project="$PROJECT" --replication-policy=automatic --quiet
+  gcloud secrets add-iam-policy-binding "$SECRET" \
+    --project="$PROJECT" \
+    --member="serviceAccount:${COMPUTE_SA}" \
+    --role="roles/secretmanager.secretAccessor" --quiet >/dev/null || true
+done
+
+WEB_ORIGIN_DEFAULT="${WEB_ORIGIN:-}"
+MAX_CONCURRENT_RUNS="${MAX_CONCURRENT_RUNS:-3}"
+
 echo "==> Deploy patient (healthy revision)"
 gcloud run deploy patient \
   --project="$PROJECT" --region="$REGION" \
@@ -103,13 +116,29 @@ gcloud run services add-iam-policy-binding chaos-controller \
   --role="roles/run.invoker" --quiet
 
 echo "==> Deploy api"
+API_ENV="MODE=gcp,GCP_PROJECT_ID=${PROJECT},GCP_REGION=${REGION},VERTEX_LOCATION=${REGION},PATIENT_SERVICE_NAME=patient,PATIENT_SERVICE_URL=${PATIENT_URL},PATIENT_HEALTH_URL=${PATIENT_URL}/health,CHAOS_CONTROLLER_URL=${CHAOS_URL},APP_SECRET=deployed-secret,MAX_CONCURRENT_RUNS=${MAX_CONCURRENT_RUNS},MAX_CONCURRENT_PER_SERVICE=1"
+if [[ -n "${WEB_ORIGIN_DEFAULT}" ]]; then
+  API_ENV="${API_ENV},WEB_ORIGIN=${WEB_ORIGIN_DEFAULT}"
+fi
+
+API_SECRETS="CHAOS_ADMIN_TOKEN=chaos-admin-token:latest"
+# Mount paging secrets only when a version exists (fail-open deploy without them).
+if gcloud secrets versions list slack-webhook-url --project="$PROJECT" --limit=1 --format='value(name)' 2>/dev/null | grep -q .; then
+  API_SECRETS="${API_SECRETS},SLACK_WEBHOOK_URL=slack-webhook-url:latest"
+fi
+if gcloud secrets versions list pagerduty-routing-key --project="$PROJECT" --limit=1 --format='value(name)' 2>/dev/null | grep -q .; then
+  API_SECRETS="${API_SECRETS},PAGERDUTY_ROUTING_KEY=pagerduty-routing-key:latest"
+fi
+
+# --no-cpu-throttling: investigation continues after /investigate returns (background work).
 gcloud run deploy api \
   --project="$PROJECT" --region="$REGION" \
   --image="${REPO}/api:latest" \
   --no-allow-unauthenticated \
+  --no-cpu-throttling \
   --min-instances=0 --max-instances=2 \
-  --set-env-vars="MODE=gcp,GCP_PROJECT_ID=${PROJECT},GCP_REGION=${REGION},VERTEX_LOCATION=${REGION},PATIENT_SERVICE_NAME=patient,PATIENT_SERVICE_URL=${PATIENT_URL},PATIENT_HEALTH_URL=${PATIENT_URL}/health,CHAOS_CONTROLLER_URL=${CHAOS_URL},APP_SECRET=deployed-secret" \
-  --set-secrets="CHAOS_ADMIN_TOKEN=chaos-admin-token:latest" \
+  --set-env-vars="${API_ENV}" \
+  --set-secrets="${API_SECRETS}" \
   --quiet
 
 API_URL="$(gcloud run services describe api --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
@@ -124,6 +153,10 @@ gcloud projects add-iam-policy-binding "$PROJECT" \
 gcloud projects add-iam-policy-binding "$PROJECT" \
   --member="serviceAccount:${COMPUTE_SA}" \
   --role="roles/run.viewer" --quiet >/dev/null || true
+# API reads Cloud Monitoring uptime checks / time series
+gcloud projects add-iam-policy-binding "$PROJECT" \
+  --member="serviceAccount:${COMPUTE_SA}" \
+  --role="roles/monitoring.viewer" --quiet >/dev/null || true
 
 gcloud run services add-iam-policy-binding api \
   --project="$PROJECT" --region="$REGION" \

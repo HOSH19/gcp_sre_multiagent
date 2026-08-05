@@ -34,18 +34,18 @@ async function injectChaos(scenario: ScenarioId): Promise<void> {
 /** Reset → inject → investigate → auto-approve (same effectiveness check as CLI eval). */
 export async function runEvalScenario(
   scenario: ScenarioId,
-  opts?: { onRunCreated?: (runId: string) => void },
+  opts?: { onRunCreated?: (runId: string) => void | Promise<void> },
 ): Promise<EvalScenarioResult> {
   await resetChaos();
   await new Promise((r) => setTimeout(r, 50));
   await injectChaos(scenario);
 
-  const run = createRun({
+  const run = await createRun({
     trigger: "eval",
     scenario,
     patientService: config.patientServiceName,
   });
-  opts?.onRunCreated?.(run.id);
+  await opts?.onRunCreated?.(run.id);
 
   const investigated = await startInvestigation(run.id);
   if (investigated.status !== "awaiting_approval") {

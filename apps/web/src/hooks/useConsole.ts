@@ -32,6 +32,16 @@ export function useConsole() {
     void fetchApiHealth().then(setApiHealth);
   }, []);
 
+  // Deep-link from Slack/PagerDuty: /?runId=...
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const runId = new URLSearchParams(window.location.search).get("runId");
+    if (!runId) return;
+    void fetchRun(runId)
+      .then(setRun)
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+  }, []);
+
   // Poll while agents are actively working so the timeline fills in live.
   useEffect(() => {
     if (!run || !LIVE_STATUSES.has(run.status)) return;
@@ -40,6 +50,17 @@ export function useConsole() {
         .then(setRun)
         .catch((err) => setError(err instanceof Error ? err.message : String(err)));
     }, 700);
+    return () => clearInterval(t);
+  }, [run?.id, run?.status]);
+
+  // Keep polling while awaiting approval so operators following a deep-link see updates.
+  useEffect(() => {
+    if (!run || run.status !== "awaiting_approval") return;
+    const t = setInterval(() => {
+      void fetchRun(run.id)
+        .then(setRun)
+        .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+    }, 2000);
     return () => clearInterval(t);
   }, [run?.id, run?.status]);
 

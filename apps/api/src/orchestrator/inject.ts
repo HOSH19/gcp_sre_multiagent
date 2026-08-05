@@ -1,6 +1,6 @@
 import type { InvestigationRun, ScenarioId } from "@gcp-sre/shared";
 import { config } from "../config.js";
-import { createRun, getRun, saveRun } from "../store/index.js";
+import { appendEvent, createRun, getRun, saveRun } from "../store/index.js";
 import { chaosFetch } from "../tools/chaosClient.js";
 import { startInvestigation } from "./investigate.js";
 
@@ -20,7 +20,7 @@ export async function injectAndInvestigate(opts: {
   trigger: InvestigationRun["trigger"];
 }): Promise<InvestigationRun> {
   await injectChaos(opts.scenario);
-  const run = createRun({
+  const run = await createRun({
     trigger: opts.trigger,
     scenario: opts.scenario,
     patientService: config.patientServiceName,
@@ -29,23 +29,52 @@ export async function injectAndInvestigate(opts: {
 }
 
 /**
- * Inject + create run, then continue investigation in the background.
- * Returns immediately so the UI can poll live timeline events.
+ * Create a queued run and return immediately so the web UI / BFF never block on
+ * chaos inject (Cloud Run traffic/env mutations can take 10–30s) or the agent pipeline.
+ * Inject + investigation continue in the background; the console polls `/runs/:id`.
  */
 export async function injectAndQueueInvestigation(opts: {
   scenario: ScenarioId;
   trigger: InvestigationRun["trigger"];
 }): Promise<InvestigationRun> {
-  await injectChaos(opts.scenario);
-  const run = createRun({
+  const run = await createRun({
     trigger: opts.trigger,
     scenario: opts.scenario,
     patientService: config.patientServiceName,
   });
   run.status = "queued";
-  saveRun(run);
-  void startInvestigation(run.id).catch((err) => {
-    console.error(`[investigate] background failure ${run.id}:`, err);
+  await saveRun(run);
+  await appendEvent(run.id, {
+    agent: "orchestrator",
+    type: "status",
+    message: `Queued; injecting chaos scenario=${opts.scenario}`,
   });
-  return getRun(run.id)!;
+
+  void (async () => {
+    try {
+      await injectChaos(opts.scenario);
+      await appendEvent(run.id, {
+        agent: "orchestrator",
+        type: "status",
+        message: `Chaos injected (${opts.scenario}); starting investigation`,
+      });
+      await startInvestigation(run.id);
+    } catch (err) {
+      const current = await getRun(run.id);
+      // startInvestigation already persists failures once running; cover inject-time errors.
+      if (current && current.status === "queued") {
+        current.status = "failed";
+        current.error = err instanceof Error ? err.message : String(err);
+        await appendEvent(current.id, {
+          agent: "orchestrator",
+          type: "error",
+          message: current.error,
+        });
+        await saveRun(current);
+      }
+      console.error(`[investigate] background failure ${run.id}:`, err);
+    }
+  })();
+
+  return (await getRun(run.id))!;
 }

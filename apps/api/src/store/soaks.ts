@@ -1,6 +1,14 @@
 import { newId, nowIso, SCENARIOS, type ScenarioId } from "@gcp-sre/shared";
-import { getActiveRunId } from "./lock.js";
-import { getRun } from "./runs.js";
+import { config } from "../config.js";
+import {
+  SOAK_LOCK_SCOPE,
+  firestoreGetActiveSoakId,
+  firestoreGetSoak,
+  firestoreReleaseLease,
+  firestoreSaveSoak,
+  firestoreTryAcquireLease,
+} from "./firestore.js";
+import { isAnyInvestigationBusy } from "./lock.js";
 import {
   activeSoakId,
   setActiveSoakId,
@@ -13,34 +21,45 @@ export type { SoakJob, SoakScenarioResult } from "./soakMemory.js";
 
 const SCENARIO_ORDER = Object.keys(SCENARIOS) as ScenarioId[];
 
-export function getSoak(id: string): SoakJob | undefined {
-  return soaks.get(id);
+export async function getSoak(id: string): Promise<SoakJob | undefined> {
+  const cached = soaks.get(id);
+  if (cached) return cached;
+  if (config.useDurableStore) {
+    const fromFs = await firestoreGetSoak(id);
+    if (fromFs) soaks.set(id, fromFs);
+    return fromFs;
+  }
+  return undefined;
 }
 
-export function getActiveSoakId(): string | null {
+export async function getActiveSoakId(): Promise<string | null> {
+  if (config.useDurableStore) {
+    return firestoreGetActiveSoakId();
+  }
   return activeSoakId;
 }
 
-export function isSoakBusy(): boolean {
-  if (!activeSoakId) return false;
-  const soak = soaks.get(activeSoakId);
+export async function isSoakBusy(): Promise<boolean> {
+  const id = await getActiveSoakId();
+  if (!id) return false;
+  const soak = await getSoak(id);
   return Boolean(soak && (soak.status === "queued" || soak.status === "running"));
 }
 
-export function isInvestigationBusy(): boolean {
-  const id = getActiveRunId();
-  if (!id) return false;
-  const run = getRun(id);
-  return Boolean(run && ["queued", "running", "awaiting_approval", "remediating"].includes(run.status));
+export async function isInvestigationBusy(): Promise<boolean> {
+  return isAnyInvestigationBusy();
 }
 
-function saveSoak(job: SoakJob): SoakJob {
+export async function saveSoak(job: SoakJob): Promise<SoakJob> {
   job.updatedAt = nowIso();
   soaks.set(job.id, job);
+  if (config.useDurableStore) {
+    await firestoreSaveSoak(job);
+  }
   return job;
 }
 
-export function createSoakJob(): SoakJob {
+export async function createSoakJob(): Promise<SoakJob> {
   const now = nowIso();
   const results: SoakScenarioResult[] = SCENARIO_ORDER.map((scenario) => ({
     scenario,
@@ -60,42 +79,55 @@ export function createSoakJob(): SoakJob {
     totalCostUsd: 0,
   };
   soaks.set(job.id, job);
+  if (config.useDurableStore) {
+    await firestoreSaveSoak(job);
+  }
   return job;
 }
 
-export function tryAcquireSoakLock(soakId: string): boolean {
-  if (isSoakBusy() && activeSoakId !== soakId) return false;
-  if (isInvestigationBusy()) return false;
+export async function tryAcquireSoakLock(soakId: string): Promise<boolean> {
+  if (config.useDurableStore) {
+    if (await isInvestigationBusy()) return false;
+    const ok = await firestoreTryAcquireLease(SOAK_LOCK_SCOPE, soakId, 1);
+    if (ok) setActiveSoakId(soakId);
+    return ok;
+  }
+  if ((await isSoakBusy()) && activeSoakId !== soakId) return false;
+  if (await isInvestigationBusy()) return false;
   setActiveSoakId(soakId);
   return true;
 }
 
-export function releaseSoakLock(soakId: string): void {
+export async function releaseSoakLock(soakId: string): Promise<void> {
+  if (config.useDurableStore) {
+    await firestoreReleaseLease(SOAK_LOCK_SCOPE, soakId);
+  }
   if (activeSoakId === soakId) setActiveSoakId(null);
 }
 
-/** Mark active soak failed and clear the in-memory lock (does not stop an in-flight run). */
-export function cancelActiveSoak(reason = "cancelled by operator"): SoakJob | null {
-  const id = activeSoakId;
+/** Mark active soak failed and clear the lock (does not stop an in-flight run). */
+export async function cancelActiveSoak(reason = "cancelled by operator"): Promise<SoakJob | null> {
+  const id = await getActiveSoakId();
   if (!id) return null;
-  const soak = soaks.get(id);
+  const soak = await getSoak(id);
   if (!soak) {
-    setActiveSoakId(null);
+    await releaseSoakLock(id);
     return null;
   }
   if (soak.status === "queued" || soak.status === "running") {
     soak.status = "failed";
     soak.error = reason;
     soak.currentScenario = null;
-    saveSoak(soak);
+    await saveSoak(soak);
   }
-  setActiveSoakId(null);
+  await releaseSoakLock(id);
   return soak;
 }
 
-export function getActiveSoak(): SoakJob | null {
-  if (!activeSoakId) return null;
-  return soaks.get(activeSoakId) ?? null;
+export async function getActiveSoak(): Promise<SoakJob | null> {
+  const id = await getActiveSoakId();
+  if (!id) return null;
+  return (await getSoak(id)) ?? null;
 }
 
-export { saveSoak, SCENARIO_ORDER };
+export { SCENARIO_ORDER };

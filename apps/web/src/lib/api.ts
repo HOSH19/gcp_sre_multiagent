@@ -23,12 +23,19 @@ export async function injectScenario(scenario: ScenarioId): Promise<void> {
 }
 
 export async function startInvestigate(scenario: ScenarioId): Promise<Run> {
-  const res = await fetch(`${API_URL}/investigate`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenario, inject: true }),
-  });
-  const body = await res.json();
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/investigate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scenario, inject: true }),
+    });
+  } catch {
+    throw new Error(
+      "Network error talking to API (is `gcloud run services proxy web` still running on :8080?)",
+    );
+  }
+  const body = await res.json().catch(() => ({} as { error?: string }));
   if (!res.ok) throw new Error(body.error ?? res.statusText);
   return body.run as Run;
 }

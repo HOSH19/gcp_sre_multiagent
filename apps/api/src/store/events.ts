@@ -1,11 +1,13 @@
 import { newId, nowIso, type AgentEvent, type IncidentReport } from "@gcp-sre/shared";
+import { config } from "../config.js";
+import { firestoreAppendEvent } from "./firestore.js";
 import { getRun, saveRun } from "./runs.js";
 
-export function appendEvent(
+export async function appendEvent(
   runId: string,
   event: Omit<AgentEvent, "id" | "runId" | "at"> & { at?: string },
-): AgentEvent {
-  const run = getRun(runId);
+): Promise<AgentEvent> {
+  const run = await getRun(runId);
   if (!run) throw new Error(`run not found: ${runId}`);
   const full: AgentEvent = {
     id: newId("evt"),
@@ -23,13 +25,16 @@ export function appendEvent(
   if (event.costUsdDelta) run.costUsd += event.costUsdDelta;
   if (event.tokensIn) run.tokensIn += event.tokensIn;
   if (event.tokensOut) run.tokensOut += event.tokensOut;
-  saveRun(run);
+  await saveRun(run);
+  if (config.useDurableStore) {
+    await firestoreAppendEvent(runId, full);
+  }
   return full;
 }
 
-export function setReport(runId: string, report: IncidentReport): void {
-  const run = getRun(runId);
+export async function setReport(runId: string, report: IncidentReport): Promise<void> {
+  const run = await getRun(runId);
   if (!run) throw new Error(`run not found: ${runId}`);
   run.report = report;
-  saveRun(run);
+  await saveRun(run);
 }

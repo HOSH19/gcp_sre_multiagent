@@ -19,33 +19,33 @@ export {
   cancelActiveSoak,
 } from "../store/soaks.js";
 
-export function startSoak(): SoakJob {
-  if (isSoakBusy()) {
+export async function startSoak(): Promise<SoakJob> {
+  if (await isSoakBusy()) {
     throw new Error("a soak is already running (max concurrent = 1)");
   }
-  if (isInvestigationBusy()) {
+  if (await isInvestigationBusy()) {
     throw new Error("another investigation is already active (max concurrent = 1)");
   }
 
-  const job = createSoakJob();
-  if (!tryAcquireSoakLock(job.id)) {
+  const job = await createSoakJob();
+  if (!(await tryAcquireSoakLock(job.id))) {
     job.status = "failed";
     job.error = "another investigation is already active (max concurrent = 1)";
-    saveSoak(job);
+    await saveSoak(job);
     throw new Error(job.error);
   }
 
   job.status = "running";
-  saveSoak(job);
+  await saveSoak(job);
 
-  void runSoakBackground(job.id).catch((err) => {
-    const current = getSoak(job.id);
+  void runSoakBackground(job.id).catch(async (err) => {
+    const current = await getSoak(job.id);
     if (current) {
       current.status = "failed";
       current.error = err instanceof Error ? err.message : String(err);
-      saveSoak(current);
+      await saveSoak(current);
     }
-    releaseSoakLock(job.id);
+    await releaseSoakLock(job.id);
     console.error(`[soak] background failure ${job.id}:`, err);
   });
 
@@ -53,13 +53,13 @@ export function startSoak(): SoakJob {
 }
 
 async function runSoakBackground(soakId: string): Promise<void> {
-  const job = getSoak(soakId);
+  const job = await getSoak(soakId);
   if (!job) return;
 
   for (let i = 0; i < SCENARIO_ORDER.length; i++) {
-    const latest = getSoak(soakId);
+    const latest = await getSoak(soakId);
     if (!latest || latest.status !== "running") {
-      releaseSoakLock(soakId);
+      await releaseSoakLock(soakId);
       return;
     }
 
@@ -67,21 +67,21 @@ async function runSoakBackground(soakId: string): Promise<void> {
     latest.currentScenario = scenario;
     latest.currentRunId = null;
     latest.results[i] = { scenario, phase: "running" };
-    saveSoak(latest);
+    await saveSoak(latest);
 
     try {
       const result = await runEvalScenario(scenario, {
-        onRunCreated: (runId) => {
-          const current = getSoak(soakId);
+        onRunCreated: async (runId) => {
+          const current = await getSoak(soakId);
           if (!current || current.status !== "running") return;
           current.currentRunId = runId;
           current.results[i] = { ...current.results[i]!, scenario, phase: "running", runId };
-          saveSoak(current);
+          await saveSoak(current);
         },
       });
-      const current = getSoak(soakId);
+      const current = await getSoak(soakId);
       if (!current || current.status !== "running") {
-        releaseSoakLock(soakId);
+        await releaseSoakLock(soakId);
         return;
       }
       current.results[i] = {
@@ -99,24 +99,24 @@ async function runSoakBackground(soakId: string): Promise<void> {
       if (result.runId) current.currentRunId = result.runId;
       if (result.ok) current.passed += 1;
       current.totalCostUsd += result.costUsd ?? 0;
-      saveSoak(current);
+      await saveSoak(current);
     } catch (err) {
-      const current = getSoak(soakId);
+      const current = await getSoak(soakId);
       if (!current || current.status !== "running") {
-        releaseSoakLock(soakId);
+        await releaseSoakLock(soakId);
         return;
       }
       const reason = err instanceof Error ? err.message : String(err);
       current.results[i] = { scenario, phase: "failed", ok: false, reason };
-      saveSoak(current);
+      await saveSoak(current);
     }
   }
 
-  const done = getSoak(soakId);
+  const done = await getSoak(soakId);
   if (done && done.status === "running") {
     done.currentScenario = null;
     done.status = "completed";
-    saveSoak(done);
+    await saveSoak(done);
   }
-  releaseSoakLock(soakId);
+  await releaseSoakLock(soakId);
 }

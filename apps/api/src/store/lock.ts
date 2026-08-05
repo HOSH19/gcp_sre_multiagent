@@ -1,21 +1,105 @@
-import { runs, activeRunId, setActiveRunId } from "./memory.js";
+import { config } from "../config.js";
+import {
+  INVESTIGATION_LOCK_SCOPE,
+  firestoreCountActiveLeases,
+  firestoreGetActiveLeaseRunId,
+  firestoreListActiveLeases,
+  firestoreReleaseLease,
+  firestoreTryAcquireLease,
+} from "./firestore.js";
+import { getRun, saveRun } from "./runs.js";
+import {
+  activeRunId,
+  activeRunIds,
+  addActiveRunId,
+  removeActiveRunId,
+  setActiveRunId,
+} from "./memory.js";
 
-export function getActiveRunId(): string | null {
+const BUSY = new Set(["queued", "running", "awaiting_approval", "remediating"]);
+
+export async function getActiveRunId(): Promise<string | null> {
+  if (config.useDurableStore) {
+    return firestoreGetActiveLeaseRunId(INVESTIGATION_LOCK_SCOPE);
+  }
   return activeRunId;
 }
 
-export function tryAcquireLock(runId: string): boolean {
-  if (!activeRunId || activeRunId === runId) {
-    setActiveRunId(runId);
+export async function listActiveRunIds(): Promise<string[]> {
+  if (config.useDurableStore) {
+    const holders = await firestoreListActiveLeases(INVESTIGATION_LOCK_SCOPE);
+    return holders.map((h) => h.runId);
+  }
+  return [...activeRunIds];
+}
+
+export async function countActiveLeases(): Promise<number> {
+  if (config.useDurableStore) {
+    return firestoreCountActiveLeases(INVESTIGATION_LOCK_SCOPE);
+  }
+  return activeRunIds.size;
+}
+
+/**
+ * True when any leased investigation is still in a busy status.
+ * Used by soak to avoid overlapping with live IR work.
+ */
+export async function isAnyInvestigationBusy(): Promise<boolean> {
+  const ids = await listActiveRunIds();
+  for (const id of ids) {
+    const run = await getRun(id);
+    if (run && BUSY.has(run.status)) return true;
+  }
+  return false;
+}
+
+export async function tryAcquireLock(runId: string): Promise<boolean> {
+  if (config.useDurableStore) {
+    const ok = await firestoreTryAcquireLease(
+      INVESTIGATION_LOCK_SCOPE,
+      runId,
+      config.maxConcurrentRuns,
+    );
+    if (!ok) return false;
+    const run = await getRun(runId);
+    if (run) {
+      run.leaseOwner = config.instanceId;
+      run.leaseExpiresAt = new Date(Date.now() + config.leaseTtlMs).toISOString();
+      await saveRun(run);
+    }
+    addActiveRunId(runId);
     return true;
   }
-  const active = runs.get(activeRunId);
-  const busy = active && ["queued", "running", "awaiting_approval", "remediating"].includes(active.status);
-  if (busy) return false;
-  setActiveRunId(runId);
+
+  // Memory adapter: honor MAX_CONCURRENT_RUNS across process-local holders.
+  if (activeRunIds.has(runId)) {
+    addActiveRunId(runId);
+    return true;
+  }
+
+  // Drop stale holders whose runs finished or disappeared.
+  for (const id of [...activeRunIds]) {
+    const holder = await getRun(id);
+    if (!holder || !BUSY.has(holder.status)) {
+      removeActiveRunId(id);
+    }
+  }
+
+  if (activeRunIds.size >= config.maxConcurrentRuns) return false;
+  addActiveRunId(runId);
   return true;
 }
 
-export function releaseLock(runId: string): void {
-  if (activeRunId === runId) setActiveRunId(null);
+export async function releaseLock(runId: string): Promise<void> {
+  if (config.useDurableStore) {
+    await firestoreReleaseLease(INVESTIGATION_LOCK_SCOPE, runId);
+    const run = await getRun(runId);
+    if (run) {
+      run.leaseOwner = undefined;
+      run.leaseExpiresAt = undefined;
+      await saveRun(run);
+    }
+  }
+  removeActiveRunId(runId);
+  if (activeRunIds.size === 0) setActiveRunId(null);
 }

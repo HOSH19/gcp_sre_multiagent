@@ -92,6 +92,15 @@ resource "google_bigquery_table" "traces" {
     { name = "tokensOut", type = "INTEGER", mode = "NULLABLE" },
     { name = "project", type = "STRING", mode = "NULLABLE" },
     { name = "ingestedAt", type = "TIMESTAMP", mode = "NULLABLE" },
+    { name = "targetService", type = "STRING", mode = "NULLABLE" },
+    { name = "rootCause", type = "STRING", mode = "NULLABLE" },
+    { name = "approvalDecision", type = "STRING", mode = "NULLABLE" },
+    { name = "agentSteps", type = "INTEGER", mode = "NULLABLE" },
+    { name = "toolCalls", type = "INTEGER", mode = "NULLABLE" },
+    { name = "durationMs", type = "INTEGER", mode = "NULLABLE" },
+    { name = "reportGcsUri", type = "STRING", mode = "NULLABLE" },
+    { name = "region", type = "STRING", mode = "NULLABLE" },
+    { name = "eventsJson", type = "STRING", mode = "NULLABLE" },
   ])
 }
 
@@ -123,6 +132,23 @@ resource "google_secret_manager_secret" "chaos_token" {
 resource "google_secret_manager_secret_version" "chaos_token" {
   secret      = google_secret_manager_secret.chaos_token.id
   secret_data = var.chaos_admin_token
+}
+
+# Optional paging secrets — create empty placeholders; populate versions out-of-band.
+resource "google_secret_manager_secret" "slack_webhook" {
+  secret_id = "slack-webhook-url"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret" "pagerduty_routing_key" {
+  secret_id = "pagerduty-routing-key"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
 }
 
 # Budget alerts at $20 and $40 (requires billing_account)
@@ -166,4 +192,12 @@ output "bigquery_dataset" {
 
 output "artifacts_bucket" {
   value = google_storage_bucket.artifacts.name
+}
+
+output "slack_webhook_secret" {
+  value = google_secret_manager_secret.slack_webhook.secret_id
+}
+
+output "pagerduty_routing_key_secret" {
+  value = google_secret_manager_secret.pagerduty_routing_key.secret_id
 }

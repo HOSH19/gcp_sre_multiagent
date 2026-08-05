@@ -28,15 +28,21 @@ function entryText(entry: LogEntry): string {
   return "(empty)";
 }
 
-export async function queryPatientLogs(opts?: {
+export async function queryServiceLogs(opts?: {
   filterExtra?: string;
   pageSize?: number;
+  serviceName?: string;
+  projectId?: string;
+  region?: string;
 }): Promise<Array<{ timestamp?: string; severity?: string; message: string; revision?: string }>> {
   const token = await accessToken();
+  const serviceName = opts?.serviceName ?? config.patientServiceName;
+  const projectId = opts?.projectId ?? config.projectId;
+  const region = opts?.region ?? config.region;
   const baseFilter = [
     'resource.type="cloud_run_revision"',
-    `resource.labels.service_name="${config.patientServiceName}"`,
-    `resource.labels.location="${config.region}"`,
+    `resource.labels.service_name="${serviceName}"`,
+    `resource.labels.location="${region}"`,
     opts?.filterExtra,
   ]
     .filter(Boolean)
@@ -49,7 +55,7 @@ export async function queryPatientLogs(opts?: {
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      resourceNames: [`projects/${config.projectId}`],
+      resourceNames: [`projects/${projectId}`],
       filter: baseFilter,
       orderBy: "timestamp desc",
       pageSize: opts?.pageSize ?? 40,
@@ -65,10 +71,23 @@ export async function queryPatientLogs(opts?: {
   }));
 }
 
-export async function queryPatientErrors(pageSize = 30): Promise<Array<{ message: string; count: number }>> {
-  const entries = await queryPatientLogs({
+/** @deprecated Prefer queryServiceLogs */
+export async function queryPatientLogs(opts?: {
+  filterExtra?: string;
+  pageSize?: number;
+}): Promise<Array<{ timestamp?: string; severity?: string; message: string; revision?: string }>> {
+  return queryServiceLogs(opts);
+}
+
+export async function queryServiceErrors(
+  opts?: { pageSize?: number; serviceName?: string; projectId?: string; region?: string },
+): Promise<Array<{ message: string; count: number }>> {
+  const entries = await queryServiceLogs({
     filterExtra: "severity>=ERROR",
-    pageSize,
+    pageSize: opts?.pageSize ?? 30,
+    serviceName: opts?.serviceName,
+    projectId: opts?.projectId,
+    region: opts?.region,
   });
   const counts = new Map<string, number>();
   for (const e of entries) {
@@ -78,4 +97,9 @@ export async function queryPatientErrors(pageSize = 30): Promise<Array<{ message
   const errors = [...counts.entries()].map(([message, count]) => ({ message, count }));
   if (!errors.length) return [{ message: "No recent error-severity log entries", count: 0 }];
   return errors;
+}
+
+/** @deprecated Prefer queryServiceErrors */
+export async function queryPatientErrors(pageSize = 30): Promise<Array<{ message: string; count: number }>> {
+  return queryServiceErrors({ pageSize });
 }

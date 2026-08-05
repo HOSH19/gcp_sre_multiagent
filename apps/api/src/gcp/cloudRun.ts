@@ -5,6 +5,8 @@ type EnvVar = { name?: string | null; value?: string | null };
 type Container = { env?: EnvVar[] | null; [key: string]: unknown };
 type TrafficTarget = { type?: string; revision?: string; percent?: number };
 type Service = {
+  name?: string;
+  uri?: string;
   template?: { containers?: Container[] };
   traffic?: TrafficTarget[];
   latestReadyRevision?: string;
@@ -15,13 +17,37 @@ type Revision = {
   createTime?: string;
 };
 
+export type CloudRunServiceRef = {
+  projectId?: string;
+  region?: string;
+  name?: string;
+};
+
 const auth = new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/cloud-platform"] });
 
-function serviceResource(): string {
-  return `projects/${config.projectId}/locations/${config.region}/services/${config.patientServiceName}`;
+function resolveRef(ref?: CloudRunServiceRef): Required<CloudRunServiceRef> {
+  return {
+    projectId: ref?.projectId ?? config.projectId,
+    region: ref?.region ?? config.region,
+    name: ref?.name ?? config.patientServiceName,
+  };
+}
+
+function serviceResource(ref?: CloudRunServiceRef): string {
+  const r = resolveRef(ref);
+  return `projects/${r.projectId}/locations/${r.region}/services/${r.name}`;
+}
+
+function servicesParent(projectId: string, region: string): string {
+  return `projects/${projectId}/locations/${region}/services`;
 }
 
 function shortRevision(name: string): string {
+  const parts = name.split("/");
+  return parts[parts.length - 1] ?? name;
+}
+
+function shortServiceName(name: string): string {
   const parts = name.split("/");
   return parts[parts.length - 1] ?? name;
 }
@@ -49,12 +75,45 @@ function envFrom(container?: Container | null): Record<string, string> {
   return out;
 }
 
-export async function fetchCloudRunService(): Promise<{
+export async function listCloudRunServicesRaw(opts?: {
+  projectId?: string;
+  region?: string;
+}): Promise<Array<{ name: string; uri?: string; latestReadyRevision?: string }>> {
+  const projectId = opts?.projectId ?? config.projectId;
+  const region = opts?.region ?? config.region;
+  const services: Array<{ name: string; uri?: string; latestReadyRevision?: string }> = [];
+  let pageToken: string | undefined;
+
+  do {
+    const path =
+      `${servicesParent(projectId, region)}` +
+      (pageToken ? `?pageToken=${encodeURIComponent(pageToken)}` : "");
+    const res = await runFetch(path);
+    if (!res.ok) {
+      throw new Error(`Cloud Run listServices failed (${res.status}): ${await res.text()}`);
+    }
+    const body = (await res.json()) as { services?: Service[]; nextPageToken?: string };
+    for (const s of body.services ?? []) {
+      services.push({
+        name: shortServiceName(s.name ?? ""),
+        uri: s.uri,
+        latestReadyRevision: s.latestReadyRevision
+          ? shortRevision(s.latestReadyRevision)
+          : undefined,
+      });
+    }
+    pageToken = body.nextPageToken;
+  } while (pageToken);
+
+  return services.filter((s) => s.name);
+}
+
+export async function fetchCloudRunService(ref?: CloudRunServiceRef): Promise<{
   traffic: Record<string, number>;
   env: Record<string, string>;
   latestReadyRevision?: string;
 }> {
-  const res = await runFetch(serviceResource());
+  const res = await runFetch(serviceResource(ref));
   if (!res.ok) throw new Error(`Cloud Run getService failed (${res.status}): ${await res.text()}`);
   const service = (await res.json()) as Service;
   const traffic: Record<string, number> = {};
@@ -75,10 +134,10 @@ export async function fetchCloudRunService(): Promise<{
   };
 }
 
-export async function fetchCloudRunRevisions(): Promise<
-  Array<{ name: string; healthy: boolean; env: Record<string, string> }>
-> {
-  const res = await runFetch(`${serviceResource()}/revisions?pageSize=20`);
+export async function fetchCloudRunRevisions(
+  ref?: CloudRunServiceRef,
+): Promise<Array<{ name: string; healthy: boolean; env: Record<string, string> }>> {
+  const res = await runFetch(`${serviceResource(ref)}/revisions?pageSize=20`);
   if (!res.ok) throw new Error(`Cloud Run listRevisions failed (${res.status}): ${await res.text()}`);
   const body = (await res.json()) as { revisions?: Revision[] };
   return (body.revisions ?? []).map((r) => {

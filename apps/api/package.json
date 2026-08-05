@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@gcp-sre/shared": "*",
+    "@google-cloud/bigquery": "^8.3.1",
+    "@google-cloud/firestore": "^8.7.1",
+    "@google-cloud/storage": "^7.21.0",
     "@hono/node-server": "^1.14.1",
     "google-auth-library": "^9.15.1",
     "hono": "^4.7.5"

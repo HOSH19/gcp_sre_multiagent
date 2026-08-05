@@ -25,7 +25,7 @@ export function SoakPanel(props: {
 
   return (
     <div style={card}>
-      <h2 style={h2}>3. Scenario soak</h2>
+      <h2 style={h2}>2. Scenario soak</h2>
       <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.45, margin: "0 0 12px" }}>
         Runs all three scenarios sequentially (reset → inject → investigate).{" "}
         <strong style={{ color: "var(--text)", fontWeight: 600 }}>

@@ -1,6 +1,5 @@
 "use client";
 
-import { ApprovalPanel } from "@/components/ApprovalPanel";
 import { Header } from "@/components/Header";
 import { InjectPanel } from "@/components/InjectPanel";
 import { SidePanel } from "@/components/SidePanel";
@@ -30,19 +29,16 @@ export default function HomePage() {
           onInject={c.inject}
           onInvestigate={c.investigate}
         />
-        <ApprovalPanel
-          busy={c.locked || c.soakRunning}
-          canDecide={c.run?.status === "awaiting_approval" && !c.soakRunning}
-          onApprove={c.approve}
-          onDeny={c.deny}
-        />
         <SoakPanel soak={c.soak} locked={c.locked} onStart={c.startSoak} />
       </section>
       {c.error && (
         <p style={{ color: "var(--bad)", marginBottom: "1rem" }} className="mono">
           {c.error}
-          {c.error.includes("already active") || c.error.includes("already running")
-            ? " — Wait for the current investigation or soak to finish (only 1 concurrent)."
+          {c.error.includes("already active") ||
+          c.error.includes("already running") ||
+          c.error.includes("capacity reached") ||
+          c.error.includes("max per service")
+            ? " — Wait for an investigation slot (see MAX_CONCURRENT_RUNS) or finish the active run for that service."
             : ""}
         </p>
       )}
@@ -51,7 +47,15 @@ export default function HomePage() {
           Soak in progress — remediation is auto-approved for each scenario.
         </p>
       )}
-      {c.run && <StatusBanner run={c.run} />}
+      {c.run && (
+        <StatusBanner
+          run={c.run}
+          canDecide={c.run.status === "awaiting_approval" && !c.soakRunning}
+          busy={c.busy || c.soakRunning}
+          onApprove={c.approve}
+          onDeny={c.deny}
+        />
+      )}
       {c.run && (
         <section style={{ display: "grid", gap: "1rem", gridTemplateColumns: "1.2fr 0.8fr" }}>
           <Timeline run={c.run} />

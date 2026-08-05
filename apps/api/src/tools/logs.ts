@@ -1,8 +1,10 @@
 import { config } from "../config.js";
 import { fetchCloudRunRevisions, fetchCloudRunService } from "../gcp/cloudRun.js";
-import { queryPatientLogs } from "../gcp/logging.js";
+import { queryServiceLogs } from "../gcp/logging.js";
 import { chaosState } from "./chaosClient.js";
 import { evidence } from "./evidence.js";
+import { serviceRefFromRun } from "./target.js";
+import type { ToolCallContext } from "./types.js";
 
 const LOGS: Record<string, string[]> = {
   http_500s: ["POST / -> 500 forced_500", "GET /healthz -> 500 chaos_force_500"],
@@ -10,10 +12,16 @@ const LOGS: Record<string, string[]> = {
   bad_revision_traffic: ["Revision patient-bad serving 100% traffic", "GET /healthz -> 503 unhealthy_revision"],
 };
 
-export async function queryLogs() {
+export async function queryLogs(ctx?: ToolCallContext) {
+  const ref = serviceRefFromRun(ctx?.run);
   if (config.mode === "gcp") {
     try {
-      const entries = await queryPatientLogs({ pageSize: 30 });
+      const entries = await queryServiceLogs({
+        pageSize: 30,
+        serviceName: ref.name,
+        projectId: ref.projectId,
+        region: ref.region,
+      });
       const lines = entries.map((e) => {
         const rev = e.revision ? ` rev=${e.revision}` : "";
         const sev = e.severity ? `[${e.severity}] ` : "";
@@ -22,6 +30,7 @@ export async function queryLogs() {
       const preview = lines[0] ?? "(no recent log entries)";
       return evidence("queryLogs", `Recent Cloud Logging entries (${lines.length}): ${preview}`, {
         lines,
+        service: ref.name,
         source: "cloud_logging",
       });
     } catch (err) {
@@ -40,14 +49,15 @@ export async function queryLogs() {
   return evidence("queryLogs", `Recent logs (${lines.length}): ${lines[0]}`, { lines, source: "canned" });
 }
 
-export async function listRevisions() {
+export async function listRevisions(ctx?: ToolCallContext) {
+  const ref = serviceRefFromRun(ctx?.run);
   if (config.mode === "gcp") {
     try {
-      const revisions = await fetchCloudRunRevisions();
+      const revisions = await fetchCloudRunRevisions(ref);
       return evidence(
         "listRevisions",
         `Revisions: ${revisions.map((r) => `${r.name}(${r.healthy ? "healthy" : "unhealthy"})`).join(", ")}`,
-        { revisions, source: "cloud_run" },
+        { revisions, service: ref.name, source: "cloud_run" },
       );
     } catch (err) {
       const state = await chaosState();
@@ -75,12 +85,14 @@ export async function listRevisions() {
   );
 }
 
-export async function getRevisionTraffic() {
+export async function getRevisionTraffic(ctx?: ToolCallContext) {
+  const ref = serviceRefFromRun(ctx?.run);
   if (config.mode === "gcp") {
     try {
-      const { traffic } = await fetchCloudRunService();
+      const { traffic } = await fetchCloudRunService(ref);
       return evidence("getRevisionTraffic", `Traffic split: ${JSON.stringify(traffic)}`, {
         traffic,
+        service: ref.name,
         source: "cloud_run",
       });
     } catch (err) {
@@ -102,15 +114,16 @@ export async function getRevisionTraffic() {
   });
 }
 
-export async function getServiceEnv() {
+export async function getServiceEnv(ctx?: ToolCallContext) {
+  const ref = serviceRefFromRun(ctx?.run);
   if (config.mode === "gcp") {
     try {
-      const { env } = await fetchCloudRunService();
+      const { env } = await fetchCloudRunService(ref);
       const hasAppSecret = Object.keys(env).includes("APP_SECRET");
       return evidence(
         "getServiceEnv",
         hasAppSecret ? "Required env APP_SECRET is present" : "Required env APP_SECRET is MISSING",
-        { keys: Object.keys(env), hasAppSecret, source: "cloud_run" },
+        { keys: Object.keys(env), hasAppSecret, service: ref.name, source: "cloud_run" },
       );
     } catch (err) {
       const state = await chaosState();
