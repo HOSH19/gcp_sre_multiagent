@@ -1,0 +1,27 @@
+---
+description: Eval matching and ReAct hypothesis conventions for the SRE agent pipeline
+alwaysApply: true
+---
+
+# Eval matching
+
+The eval matcher in `packages/shared/src/eval.ts` uses aliases + fuzzy keyword rules to map free-form ReAct hypothesis labels to canonical scenario root causes (`application_exception_500`, `unhealthy_revision_receiving_traffic`, `missing_required_env`).
+
+**Do not keep growing the alias list** to patch individual ReAct phrasings. If new phrasing misses, prefer one of:
+
+1. Have the hypothesis agent emit a `canonicalRootCause` field alongside the free-form label (add to `HypothesisItem` type + `submitHypotheses` tool schema) and use that field directly in `matchRootCause`.
+2. Switch eval to an LLM-as-judge call (Gemini Flash Lite) that does semantic comparison rather than keyword matching.
+
+Option 1 is simpler and deterministic; prefer it when making the next eval improvement.
+
+# ReAct hypothesis agent
+
+- The hypothesis agent runs via Vertex function calling (`runReactAgent`) in `orchestrator/react.ts`.
+- It must call `submitHypotheses` to commit a root-cause ranking before exiting; deterministic fallback (`inferHypotheses`) runs only when zero tools are called.
+- If adding a `canonicalRootCause` field: update `HypothesisItem` in `packages/shared/src/types/evidence.ts`, add it to the `submitHypotheses` tool schema in `tools/schemas.ts`, and read it in `scribe.ts` before falling back to free-form label matching.
+
+# Remediation policy
+
+- Executable action types are limited to `rollback_traffic` and `patch_env` (see `orchestrator/policy.ts`).
+- Unknown action types proposed by ReAct are propose-only and never executed — do not expand the allowlist without a corresponding approval-path handler.
+- `patch_env` details must be a plain env-var map `{ KEY: "value" }`, not a metadata object. `normalizeAction` in `policy.ts` canonicalises common LLM shape mistakes.

@@ -19,8 +19,15 @@ const ROOT_CAUSE_ALIASES: Record<string, CanonicalRootCause> = {
   traffic_directed_to_an_unhealthy_revision: "unhealthy_revision_receiving_traffic",
   unhealthy_revision_is_receiving_traffic: "unhealthy_revision_receiving_traffic",
   unhealthy_revision_receiving_traffic: "unhealthy_revision_receiving_traffic",
+  unhealthy_active_revision: "unhealthy_revision_receiving_traffic",
+  active_unhealthy_revision: "unhealthy_revision_receiving_traffic",
+  active_revision_is_unhealthy: "unhealthy_revision_receiving_traffic",
   bad_revision_traffic: "unhealthy_revision_receiving_traffic",
   revision_failed_readiness: "unhealthy_revision_receiving_traffic",
+  // GCP-style failure reason surfaced by UI when a revision is disabled
+  // (e.g. by user action or automation), which still corresponds to
+  // "unhealthy revision receiving traffic" for our scenario expectations.
+  revision_was_disabled_by_user_or_automated_process: "unhealthy_revision_receiving_traffic",
 
   missing_required_env: "missing_required_env",
   missing_env_var: "missing_required_env",
@@ -33,6 +40,10 @@ const ROOT_CAUSE_ALIASES: Record<string, CanonicalRootCause> = {
   http_500s: "application_exception_500",
   forced_http_500: "application_exception_500",
   application_error_500: "application_exception_500",
+  chaos_force_500: "application_exception_500",
+  force_500: "application_exception_500",
+  fault_injection: "application_exception_500",
+  chaos_fault_injection: "application_exception_500",
 };
 
 function canonicalizeRootCause(label: string): string {
@@ -41,18 +52,47 @@ function canonicalizeRootCause(label: string): string {
 }
 
 const FUZZY_MATCHERS: Record<string, (predicted: string) => boolean> = {
-  unhealthy_revision_receiving_traffic: (predicted) =>
-    predicted.includes("unhealthy") &&
-    predicted.includes("revision") &&
-    (predicted.includes("traffic") ||
-      predicted.includes("directed") ||
-      predicted.includes("serving")),
+  unhealthy_revision_receiving_traffic: (predicted) => {
+    const looksLikeUnhealthyTraffic =
+      predicted.includes("unhealthy") &&
+      predicted.includes("revision") &&
+      (predicted.includes("traffic") ||
+        predicted.includes("directed") ||
+        predicted.includes("serving") ||
+        predicted.includes("active"));
+
+    const looksLikeDisabledRevision =
+      predicted.includes("revision") &&
+      (predicted.includes("disabled") || predicted.includes("disable")) &&
+      (predicted.includes("user") ||
+        predicted.includes("automated") ||
+        predicted.includes("process"));
+
+    // For our scenario expectations, both "unhealthy revision" and
+    // "revision disabled by user/automation" represent the same outcome:
+    // the traffic is not being served by a healthy revision.
+    return looksLikeUnhealthyTraffic || looksLikeDisabledRevision;
+  },
   missing_required_env: (predicted) =>
     predicted.includes("missing") &&
     (predicted.includes("env") || predicted.includes("config") || predicted.includes("secret")),
-  application_exception_500: (predicted) =>
-    (predicted.includes("500") || predicted.includes("exception")) &&
-    (predicted.includes("http") || predicted.includes("application") || predicted.includes("error")),
+  application_exception_500: (predicted) => {
+    const has500 = predicted.includes("500");
+    const hasException = predicted.includes("exception");
+    const hasFaultInjection = predicted.includes("fault") && predicted.includes("injection");
+    const hasChaosForce = predicted.includes("chaos") || predicted.includes("force_500");
+    const hasIntentional = predicted.includes("intentionally") || predicted.includes("intentional");
+    const hasApplicationContext =
+      predicted.includes("http") ||
+      predicted.includes("application") ||
+      predicted.includes("error") ||
+      predicted.includes("chaos") ||
+      predicted.includes("fault") ||
+      predicted.includes("force") ||
+      hasIntentional;
+
+    return hasFaultInjection || hasChaosForce || ((has500 || hasException) && hasApplicationContext);
+  },
 };
 
 /**

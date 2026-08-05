@@ -192,6 +192,7 @@ async function runMitigatorProposeReact(run: InvestigationRun): Promise<void> {
       "You are Mitigator. Propose remediation for human approval — do NOT execute mutations.",
       "Call proposeRemediation with summary, risk, and actions.",
       "Prefer allowlisted action types: rollback_traffic, patch_env.",
+      "For patch_env, details must be a literal env-var map such as {\"APP_SECRET\":\"restore-known-good\"} or {\"FORCE_500\":\"false\"}; do not emit meta keys like environment_variable or action_type.",
       "Unknown action types may be proposed for visibility but will never execute.",
       "You may call read tools if you need more context. After proposeRemediation you are done.",
     ].join(" "),

@@ -74,7 +74,12 @@ const SPECIAL_DECLS: Record<string, FunctionDeclaration> = {
             properties: {
               type: { type: "string", description: "Action type, e.g. rollback_traffic or patch_env" },
               reason: { type: "string" },
-              details: { type: "object", additionalProperties: { type: "string" } },
+              details: {
+                type: "object",
+                description:
+                  "For patch_env, use actual env var keys and values, e.g. {\"APP_SECRET\":\"restore-known-good\"} or {\"FORCE_500\":\"false\"}.",
+                additionalProperties: { type: "string" },
+              },
             },
             required: ["type", "reason"],
           },

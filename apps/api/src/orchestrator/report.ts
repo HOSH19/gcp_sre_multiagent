@@ -4,7 +4,6 @@ import {
   type ScribeToolArgs,
 } from "../tools/index.js";
 import { modelBreakdown } from "./cost.js";
-import { healthAfterApprove } from "./healthCheck.js";
 import { llmStep, runTool } from "./runner.js";
 
 /**
@@ -46,9 +45,8 @@ export async function finalizeWithScribe(
   run: InvestigationRun,
   decision: "approved" | "denied",
   executedActions?: RemediationAction[],
+  healthAfter?: { ok: boolean; detail: string },
 ): Promise<void> {
-  const healthAfter = decision === "approved" ? await healthAfterApprove() : undefined;
-
   await llmStep(
     run,
     "scribe",
@@ -63,6 +61,6 @@ export async function finalizeWithScribe(
     `{"tools":${JSON.stringify([...SCRIBE_TOOL_SEQUENCE])}}`,
   );
 
-  const scribeArgs = buildScribeArgs(run, decision, executedActions, healthAfter);
+  const scribeArgs = buildScribeArgs(run, decision, executedActions, decision === "approved" ? healthAfter : undefined);
   await runScribeTools(run, scribeArgs);
 }

@@ -14,15 +14,51 @@ export function isExecutableActionType(type: string): type is ExecutableRemediat
 function normalizeAction(raw: unknown): RemediationAction | null {
   if (!raw || typeof raw !== "object") return null;
   const obj = raw as Record<string, unknown>;
-  const type = typeof obj.type === "string" ? obj.type.trim() : "";
+  const typeRaw =
+    typeof obj.type === "string"
+      ? obj.type
+      : typeof obj.action_type === "string"
+        ? obj.action_type
+        : typeof obj.actionType === "string"
+          ? obj.actionType
+          : "";
+  const type = typeRaw.trim();
   if (!type) return null;
   const reason = typeof obj.reason === "string" ? obj.reason : "proposed by agent";
   const detailsRaw = obj.details;
   const details: Record<string, string> = {};
   if (detailsRaw && typeof detailsRaw === "object") {
-    for (const [k, v] of Object.entries(detailsRaw as Record<string, unknown>)) {
-      if (typeof v === "string") details[k] = v;
-      else if (v != null) details[k] = String(v);
+    const rec = detailsRaw as Record<string, unknown>;
+
+    if (type === "patch_env") {
+      const environmentVariable =
+        typeof rec.environment_variable === "string"
+          ? rec.environment_variable
+          : typeof rec.environmentVariable === "string"
+            ? rec.environmentVariable
+            : undefined;
+      const environmentValue =
+        typeof rec.environment_value === "string"
+          ? rec.environment_value
+          : typeof rec.value === "string"
+            ? rec.value
+            : typeof rec.env_value === "string"
+              ? rec.env_value
+              : undefined;
+
+      if (environmentVariable && environmentValue) {
+        details[environmentVariable] = environmentValue;
+      } else {
+        for (const [k, v] of Object.entries(rec)) {
+          if (typeof v === "string") details[k] = v;
+          else if (v != null) details[k] = String(v);
+        }
+      }
+    } else {
+      for (const [k, v] of Object.entries(rec)) {
+        if (typeof v === "string") details[k] = v;
+        else if (v != null) details[k] = String(v);
+      }
     }
   }
   return { type, reason, details };
