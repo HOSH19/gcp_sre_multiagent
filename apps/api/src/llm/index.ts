@@ -1,5 +1,11 @@
 import { callVertex, callVertexWithTools } from "./vertex.js";
-import { mockLlm, type FunctionDeclaration, type LlmContent, type LlmResult } from "./types.js";
+import {
+  mockLlm,
+  type FunctionDeclaration,
+  type LlmContent,
+  type LlmResult,
+  type ToolChoiceMode,
+} from "./types.js";
 import { config } from "../config.js";
 
 export async function generateText(opts: {
@@ -24,6 +30,7 @@ export async function generateWithTools(opts: {
   system: string;
   contents: LlmContent[];
   tools: FunctionDeclaration[];
+  toolChoice?: ToolChoiceMode;
   mockText?: string;
 }): Promise<LlmResult> {
   const live = await callVertexWithTools(opts);
@@ -39,4 +46,4 @@ export async function generateWithTools(opts: {
   return mockLlm(opts.model, opts.system, prompt, opts.mockText);
 }
 
-export type { LlmResult, LlmContent, FunctionDeclaration, ContentPart } from "./types.js";
+export type { LlmResult, LlmContent, FunctionDeclaration, ContentPart, ToolChoiceMode } from "./types.js";

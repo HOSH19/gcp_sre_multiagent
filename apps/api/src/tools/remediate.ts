@@ -20,12 +20,9 @@ export function proposeRemediation(run: InvestigationRun): RemediationProposal {
     };
   }
   return {
-    summary: "Disable force-500 chaos and ensure traffic stays on healthy revision",
-    risk: "Low — toggle chaos flag / confirm env",
-    actions: [
-      { type: "patch_env", reason: "Clear application fault injection", details: { FORCE_500: "false" } },
-      { type: "rollback_traffic", reason: "Ensure healthy revision serves traffic", details: { target: "good_revision" } },
-    ],
+    summary: "No allowlisted remediation for unrecognized root cause — manual review",
+    risk: "Unknown — do not auto-mutate without operator judgment",
+    actions: [],
   };
 }
 
@@ -35,7 +32,6 @@ export async function rollbackTraffic() {
 }
 
 export async function patchEnvVars(vars: Record<string, string>) {
-  if (vars.FORCE_500 === "false") await chaosFetch("/reset", { method: "POST" });
   const res = await chaosFetch("/remediate/patch-env", { method: "POST", body: JSON.stringify(vars) });
   return { ok: res.status < 300, detail: JSON.stringify(res.body) };
 }

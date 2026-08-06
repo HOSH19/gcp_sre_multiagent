@@ -2,79 +2,14 @@ import type { InvestigationRun } from "@gcp-sre/shared";
 import { queueNotifyRunStatus } from "../paging/index.js";
 import { appendEvent, getRun, releaseLock, saveRun } from "../store/index.js";
 import { patchEnvVars, rollbackTraffic, verifyHealth } from "../tools/index.js";
-import { proposeRemediation as deterministicProposal } from "../tools/remediate.js";
+import { normalizeExecutableActions } from "./approvalNormalize.js";
 import { assertCaps } from "./caps.js";
-import { executableActionsFromProposal, isExecutableActionType } from "./policy.js";
 import { finalizeWithScribe } from "./report.js";
 
 function approvedHealthSummary(health: unknown): { ok: boolean; detail: string } {
   const patientOk = Boolean((health as { raw?: { patient?: { ok?: boolean } }; summary?: string })?.raw?.patient?.ok);
   const detail = (health as { summary?: string })?.summary ?? "Post-remediation health unknown";
   return { ok: patientOk, detail };
-}
-
-function normalizeExecutableActions(run: InvestigationRun) {
-  const proposal = run.proposedRemediation;
-  if (!proposal) throw new Error("no remediation proposal");
-
-  let executable = executableActionsFromProposal(proposal);
-  const skipped = proposal.actions.filter((a) => !isExecutableActionType(a.type));
-  const fallback = executableActionsFromProposal(deterministicProposal(run));
-  const fallbackByType = new Map(fallback.map((action) => [action.type, action]));
-
-  if (run.scenario === "http_500s") {
-    if (executable.length === 0) {
-      const hasForce500Disabled = fallback.some(
-        (a) => a.type === "patch_env" && a.details.FORCE_500 === "false",
-      );
-
-      executable = hasForce500Disabled
-        ? fallback
-        : [
-            ...fallback,
-            { type: "patch_env", reason: "Disable force-500 chaos", details: { FORCE_500: "false" } },
-          ];
-    }
-
-    const hasForce500DisabledInExecutable = executable.some(
-      (a) => a.type === "patch_env" && a.details.FORCE_500 === "false",
-    );
-
-    if (!hasForce500DisabledInExecutable) {
-      const hasPatchEnv = executable.some((a) => a.type === "patch_env");
-      executable = hasPatchEnv
-        ? executable.map((a) => (a.type === "patch_env" ? { ...a, details: { ...a.details, FORCE_500: "false" } } : a))
-        : [
-            ...executable,
-            { type: "patch_env", reason: "Disable force-500 chaos", details: { FORCE_500: "false" } },
-          ];
-    }
-  }
-
-  const normalized = executable.map((action) => {
-    if (action.type !== "patch_env") return action;
-
-    const fallbackAction = fallbackByType.get(action.type);
-    const fallbackDetails = fallbackAction?.details ?? {};
-    const malformedAlias = action.details.environment_variable;
-    const hasForce500False = run.scenario === "http_500s" && action.details.FORCE_500 === "false";
-    const needsCanonicalPatch =
-      !Object.keys(action.details).length ||
-      Boolean(malformedAlias) ||
-      "action_type" in action.details ||
-      (!hasForce500False &&
-        run.hypotheses[0]?.rootCauseLabel === "missing_required_env" &&
-        !("APP_SECRET" in action.details));
-
-    if (!needsCanonicalPatch) return action;
-
-    return {
-      ...action,
-      details: { ...fallbackDetails },
-    };
-  });
-
-  return { executable: normalized, skipped };
 }
 
 async function executeActions(run: InvestigationRun): Promise<ReturnType<typeof normalizeExecutableActions>["executable"]> {

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT="${PROJECT:-sre-multiagent}"
-REGION="${REGION:-us-central1}"
-REPO="${REGION}-docker.pkg.dev/${PROJECT}/sre-agents"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=common.sh
+source "${SCRIPT_DIR}/common.sh"
 
-API_URL="$(gcloud run services describe api --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
-CHAOS_URL="$(gcloud run services describe chaos-controller --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
-PATIENT_URL="$(gcloud run services describe patient --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
+API_URL="$(run_service_url api)"
+CHAOS_URL="$(run_service_url chaos-controller)"
+PATIENT_URL="$(run_service_url patient)"
 PROJECT_NUMBER="$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')"
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 ACCOUNT="$(gcloud config get-value account)"
@@ -22,7 +22,6 @@ images:
 timeout: 1200s
 EOF
 
-# Allow web SA to invoke api + chaos
 gcloud run services add-iam-policy-binding api \
   --project="$PROJECT" --region="$REGION" \
   --member="serviceAccount:${COMPUTE_SA}" \
@@ -48,15 +47,13 @@ gcloud run deploy web \
   --set-secrets="CHAOS_ADMIN_TOKEN=chaos-admin-token:latest" \
   --quiet
 
-WEB_URL="$(gcloud run services describe web --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
+WEB_URL="$(run_service_url web)"
 
 gcloud run services add-iam-policy-binding web \
   --project="$PROJECT" --region="$REGION" \
   --member="user:${ACCOUNT}" \
   --role="roles/run.invoker" --quiet
 
-# CORS / known origin for API (optional; BFF is same-origin for browser).
-# Keep --no-cpu-throttling so background inject+investigate survives after HTTP returns.
 gcloud run services update api \
   --project="$PROJECT" --region="$REGION" \
   --update-env-vars="WEB_ORIGIN=${WEB_URL}" \
@@ -72,5 +69,5 @@ Web deployed:
 
 Open (requires your Google login / identity token):
   gcloud run services proxy web --project=${PROJECT} --region=${REGION} --port=8080
-  # then visit http://127.0.0.1:8080
+  then visit http://127.0.0.1:8080
 EOF

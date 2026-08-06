@@ -71,3 +71,67 @@ button:disabled {
 .mono {
   font-family: var(--mono);
 }
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chip-in {
+  animation: chip-in 0.28s ease-out both;
+}
+
+.console-header {
+  margin-bottom: 2.25rem;
+}
+
+.console-header-title {
+  margin: 0;
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.console-header-desc {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  width: max-content;
+  max-width: 100%;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+.console-top {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 28rem;
+  align-items: stretch;
+  margin-bottom: 1.5rem;
+}
+
+.console-top > * {
+  min-height: 0;
+  height: 100%;
+}
+
+.console-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  height: 100%;
+}
+
+.console-panel__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}

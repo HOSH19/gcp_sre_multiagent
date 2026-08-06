@@ -1,24 +1,19 @@
 import { SCENARIOS, type ScenarioId } from "@gcp-sre/shared";
-import { CHAOS_TOKEN, CHAOS_URL } from "../config.js";
+import { chaosPost } from "../chaosHttp.js";
 import { usage } from "../usage.js";
 
+/** Print known chaos scenarios. */
 export async function cmdScenarios() {
   console.log(JSON.stringify(Object.values(SCENARIOS), null, 2));
 }
 
+/** Inject a chaos scenario into the patient service. */
 export async function cmdInject(scenario: string) {
   if (!SCENARIOS[scenario as ScenarioId]) usage();
-  const res = await fetch(`${CHAOS_URL}/inject/${scenario}`, {
-    method: "POST",
-    headers: { "x-chaos-token": CHAOS_TOKEN },
-  });
-  console.log(await res.json());
+  console.log(await chaosPost(`/inject/${scenario}`));
 }
 
+/** Reset patient service to a healthy baseline. */
 export async function cmdReset() {
-  const res = await fetch(`${CHAOS_URL}/reset`, {
-    method: "POST",
-    headers: { "x-chaos-token": CHAOS_TOKEN },
-  });
-  console.log(await res.json());
+  console.log(await chaosPost("/reset"));
 }

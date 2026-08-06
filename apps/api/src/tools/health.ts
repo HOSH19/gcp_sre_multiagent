@@ -22,9 +22,6 @@ function applyChaosOverlay(patient: PatientHealth, state: Awaited<ReturnType<typ
   if (state.activeScenario === "bad_revision_traffic") {
     return { ok: false, reason: "unhealthy_revision", status: 503, revision: state.badRevision };
   }
-  if (state.activeScenario === "http_500s") {
-    return { ok: false, reason: "chaos_force_500", status: 500, revision: patient.revision };
-  }
   return patient;
 }
 

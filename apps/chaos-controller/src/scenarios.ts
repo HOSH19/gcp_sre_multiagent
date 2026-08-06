@@ -6,162 +6,97 @@ import {
   localState,
   MODE,
 } from "./config.js";
-import { getService, patchServiceEnv, trafficMap, updateTraffic } from "./cloudRun.js";
+import { patchServiceEnv, trafficMap } from "./cloudRun.js";
 import { patientChaos } from "./patientClient.js";
+import {
+  ensureAppSecretOnService,
+  refreshTrafficFromGcp,
+  shiftToBadRevision,
+  shiftToGoodRevision,
+  syncLocalFromTraffic,
+} from "./scenarioTraffic.js";
 
-function syncLocalFromTraffic(traffic: Record<string, number>) {
-  localState.traffic = traffic;
-}
+async function injectMissingConfig(scenario: ScenarioId) {
+  await patientChaos("/chaos/reset");
+  delete localState.env.APP_SECRET;
 
-async function shiftToBadRevision() {
-  const result = await updateTraffic(cloudRunConfig, [
-    { revision: localState.badRevision, percent: 100 },
-    { revision: localState.goodRevision, percent: 0 },
-  ]);
-  syncLocalFromTraffic(result.traffic);
-  return result;
-}
-
-async function shiftToGoodRevision() {
-  const result = await updateTraffic(cloudRunConfig, [
-    { revision: localState.goodRevision, percent: 100 },
-    { revision: localState.badRevision, percent: 0 },
-  ]);
-  syncLocalFromTraffic(result.traffic);
-  return result;
-}
-
-async function refreshTrafficFromGcp() {
-  try {
-    const service = await getService(cloudRunConfig);
-    syncLocalFromTraffic(trafficMap(service));
-  } catch {
-    /* best-effort */
-  }
-}
-
-export async function injectScenario(scenario: ScenarioId) {
-  localState.activeScenario = scenario;
-
-  if (scenario === "http_500s") {
-    localState.traffic = { [localState.goodRevision]: 100, [localState.badRevision]: 0 };
-    localState.env.APP_SECRET = localState.env.APP_SECRET || APP_SECRET_VALUE;
-    localState.env.FORCE_500 = "true";
-    if (isGcpMode) {
-      try {
-        await shiftToGoodRevision();
-      } catch (err) {
-        return {
-          status: 502,
-          body: { ok: false, scenario, error: `failed to pin good revision: ${String(err)}` },
-        };
-      }
-      // Bake FORCE_500 into the Cloud Run service env so ALL instances (including
-      // cold-start ones) see force500=true — not just the single instance that
-      // receives the in-memory /chaos/500 POST.
-      try {
-        const result = await patchServiceEnv(cloudRunConfig, { FORCE_500: "true" });
-        localState.env = { ...result.env };
-        if (result.latestRevision) {
-          localState.goodRevision = result.latestRevision;
-          process.env.GOOD_REVISION = result.latestRevision;
-          syncLocalFromTraffic(trafficMap(result.service));
-        }
-        return {
-          status: 200,
-          body: {
-            ok: true,
-            scenario,
-            env: localState.env,
-            note: "GCP: FORCE_500=true baked into patient Cloud Run env (new revision).",
-          },
-        };
-      } catch (err) {
-        return { status: 502, body: { ok: false, scenario, error: String(err) } };
-      }
-    }
-    // Local mode: set in-memory flag on patient via HTTP
-    return patientChaos("/chaos/500", { enabled: true });
-  }
-
-  if (scenario === "missing_config") {
-    await patientChaos("/chaos/reset");
-    delete localState.env.APP_SECRET;
-
-    if (isGcpMode) {
-      try {
-        const result = await patchServiceEnv(cloudRunConfig, {
-          APP_SECRET: null,
-          IS_BAD_REVISION: null,
-        });
-        localState.env = { ...result.env };
-        if (result.latestRevision) {
-          syncLocalFromTraffic(trafficMap(result.service));
-        }
-        return {
-          status: 200,
-          body: {
-            ok: true,
-            scenario,
-            env: localState.env,
-            note: "GCP: removed APP_SECRET from patient Cloud Run service (new revision).",
-          },
-        };
-      } catch (err) {
-        return { status: 502, body: { ok: false, scenario, error: String(err) } };
-      }
-    }
-
+  if (!isGcpMode) {
     return {
       status: 200,
       body: { ok: true, scenario, note: "Local mode: APP_SECRET removed from controller state." },
     };
   }
 
+  try {
+    const result = await patchServiceEnv(cloudRunConfig, {
+      APP_SECRET: null,
+      IS_BAD_REVISION: null,
+    });
+    localState.env = { ...result.env };
+    if (result.latestRevision) {
+      syncLocalFromTraffic(trafficMap(result.service));
+    }
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        scenario,
+        env: localState.env,
+        note: "GCP: removed APP_SECRET from patient Cloud Run service (new revision).",
+      },
+    };
+  } catch (err) {
+    return { status: 502, body: { ok: false, scenario, error: String(err) } };
+  }
+}
+
+async function injectBadRevision(scenario: ScenarioId) {
   await patientChaos("/chaos/reset");
   localState.env.APP_SECRET = localState.env.APP_SECRET || APP_SECRET_VALUE;
 
-  if (isGcpMode) {
-    try {
-      const env = (await getService(cloudRunConfig)).template?.containers?.[0]?.env ?? [];
-      const hasSecret = env.some((e) => e.name === "APP_SECRET" && e.value);
-      if (!hasSecret) {
-        await patchServiceEnv(cloudRunConfig, { APP_SECRET: APP_SECRET_VALUE, IS_BAD_REVISION: null });
-      }
-      const result = await shiftToBadRevision();
-      return {
-        status: 200,
-        body: {
-          ok: true,
-          scenario,
-          traffic: result.traffic,
-          goodRevision: localState.goodRevision,
-          badRevision: localState.badRevision,
-          note: "GCP: shifted Cloud Run traffic to bad revision",
-        },
-      };
-    } catch (err) {
-      return { status: 502, body: { ok: false, scenario, error: String(err) } };
-    }
+  if (!isGcpMode) {
+    localState.traffic = { [localState.goodRevision]: 0, [localState.badRevision]: 100 };
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        scenario,
+        traffic: localState.traffic,
+        note: "Local mode: traffic on bad revision",
+      },
+    };
   }
 
-  localState.traffic = { [localState.goodRevision]: 0, [localState.badRevision]: 100 };
-  return {
-    status: 200,
-    body: {
-      ok: true,
-      scenario,
-      traffic: localState.traffic,
-      note: "Local mode: traffic on bad revision",
-    },
-  };
+  try {
+    await ensureAppSecretOnService();
+    const result = await shiftToBadRevision();
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        scenario,
+        traffic: result.traffic,
+        goodRevision: localState.goodRevision,
+        badRevision: localState.badRevision,
+        note: "GCP: shifted Cloud Run traffic to bad revision",
+      },
+    };
+  } catch (err) {
+    return { status: 502, body: { ok: false, scenario, error: String(err) } };
+  }
+}
+
+export async function injectScenario(scenario: ScenarioId) {
+  localState.activeScenario = scenario;
+
+  if (scenario === "missing_config") return injectMissingConfig(scenario);
+  return injectBadRevision(scenario);
 }
 
 export async function resetAll() {
   localState.activeScenario = null;
   localState.traffic = { [localState.goodRevision]: 100, [localState.badRevision]: 0 };
   localState.env.APP_SECRET = APP_SECRET_VALUE;
-  delete localState.env.FORCE_500;
 
   const patient = await patientChaos("/chaos/reset");
 
@@ -170,7 +105,6 @@ export async function resetAll() {
       await patchServiceEnv(cloudRunConfig, {
         APP_SECRET: APP_SECRET_VALUE,
         IS_BAD_REVISION: null,
-        FORCE_500: null,
       });
       try {
         await shiftToGoodRevision();
@@ -209,14 +143,7 @@ export async function patchEnv(vars: Record<string, string>) {
   Object.assign(localState.env, normalized);
 
   if (isGcpMode) {
-    const patch: Record<string, string | null> = {};
-    for (const [k, v] of Object.entries(normalized)) {
-      if (k === "FORCE_500" && (v === "false" || v === "0")) {
-        patch.FORCE_500 = null;
-        continue;
-      }
-      patch[k] = v;
-    }
+    const patch: Record<string, string | null> = { ...normalized };
     const result = await patchServiceEnv(cloudRunConfig, patch);
     localState.env = { ...result.env };
     if (result.latestRevision && normalized.APP_SECRET) {

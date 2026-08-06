@@ -1,66 +1,59 @@
 "use client";
 
+import { AgentBoard } from "@/components/AgentBoard";
 import { Header } from "@/components/Header";
-import { InjectPanel } from "@/components/InjectPanel";
-import { SidePanel } from "@/components/SidePanel";
-import { SoakPanel } from "@/components/SoakPanel";
+import { HypothesesCard } from "@/components/HypothesesCard";
+import { InvestigatePanel } from "@/components/InvestigatePanel";
+import { ReportCard } from "@/components/ReportCard";
 import { StatusBanner } from "@/components/StatusBanner";
-import { Timeline } from "@/components/Timeline";
 import { useConsole } from "@/hooks/useConsole";
+
+const CAPACITY_HINTS = [
+  "already active",
+  "already running",
+  "capacity reached",
+  "max per service",
+];
+
+function ErrorBanner({ message }: { message: string }) {
+  const capacity = CAPACITY_HINTS.some((h) => message.includes(h));
+  return (
+    <p style={{ color: "var(--bad)", marginBottom: "1rem" }} className="mono">
+      {message}
+      {capacity
+        ? " — Wait for an investigation slot (see MAX_CONCURRENT_RUNS) or finish the active run for that service."
+        : ""}
+    </p>
+  );
+}
 
 export default function HomePage() {
   const c = useConsole();
 
   return (
-    <main style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.25rem 4rem" }}>
-      <Header apiHealth={c.apiHealth} />
-      <section
-        style={{
-          display: "grid",
-          gap: "1rem",
-          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-          marginBottom: "1.5rem",
-        }}
-      >
-        <InjectPanel
+    <main style={{ maxWidth: 1400, margin: "0 auto", padding: "2rem 1.25rem 4rem" }}>
+      <Header />
+      <section className="console-top">
+        <InvestigatePanel
           scenario={c.scenario}
           busy={c.locked}
           onScenario={c.setScenario}
           onInvestigate={c.investigate}
         />
-        <SoakPanel soak={c.soak} locked={c.locked} onStart={c.startSoak} />
+        <HypothesesCard run={c.run} />
+        <ReportCard run={c.run} />
       </section>
-      {c.error && (
-        <p style={{ color: "var(--bad)", marginBottom: "1rem" }} className="mono">
-          {c.error}
-          {c.error.includes("already active") ||
-          c.error.includes("already running") ||
-          c.error.includes("capacity reached") ||
-          c.error.includes("max per service")
-            ? " — Wait for an investigation slot (see MAX_CONCURRENT_RUNS) or finish the active run for that service."
-            : ""}
-        </p>
-      )}
-      {c.soakRunning && (
-        <p style={{ color: "var(--warn)", marginBottom: "1rem", fontSize: 14 }}>
-          Soak in progress — remediation is auto-approved for each scenario.
-        </p>
-      )}
+      {c.error && <ErrorBanner message={c.error} />}
       {c.run && (
         <StatusBanner
           run={c.run}
-          canDecide={c.run.status === "awaiting_approval" && !c.soakRunning}
-          busy={c.busy || c.soakRunning}
+          canDecide={c.run.status === "awaiting_approval"}
+          busy={c.busy}
           onApprove={c.approve}
           onDeny={c.deny}
         />
       )}
-      {c.run && (
-        <section style={{ display: "grid", gap: "1rem", gridTemplateColumns: "1.2fr 0.8fr" }}>
-          <Timeline run={c.run} />
-          <SidePanel run={c.run} />
-        </section>
-      )}
+      {c.run && <AgentBoard run={c.run} />}
     </main>
   );
 }

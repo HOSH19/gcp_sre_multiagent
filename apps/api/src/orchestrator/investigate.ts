@@ -12,7 +12,7 @@ const BUSY = new Set(["queued", "running", "awaiting_approval", "remediating"]);
  * Enforce MAX_CONCURRENT_PER_SERVICE (default 1) before taking a global lease.
  * Alert correlation attaches repeats; this blocks a second investigation for the same target.
  */
-export async function hasPerServiceCapacity(run: InvestigationRun): Promise<boolean> {
+async function hasPerServiceCapacity(run: InvestigationRun): Promise<boolean> {
   const target = run.targetService || run.patientService;
   if (!target) return true;
 

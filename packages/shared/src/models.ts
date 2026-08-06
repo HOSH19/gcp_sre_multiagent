@@ -6,6 +6,7 @@ const MODEL_PRICING: Record<string, { inputPerMillion: number; outputPerMillion:
   [MODEL_FLASH]: { inputPerMillion: 0.3, outputPerMillion: 2.5 },
 };
 
+/** Estimate USD cost from token counts using published Gemini list prices. */
 export function estimateCostUsd(model: string, tokensIn: number, tokensOut: number): number {
   const p = MODEL_PRICING[model] ?? MODEL_PRICING[MODEL_FLASH_LITE];
   return (tokensIn / 1e6) * p.inputPerMillion + (tokensOut / 1e6) * p.outputPerMillion;

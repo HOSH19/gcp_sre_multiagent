@@ -1,3 +1,4 @@
+/** Print CLI usage and exit. */
 export function usage(): never {
   console.log(`gcp-sre — Incident Response Crew CLI
 

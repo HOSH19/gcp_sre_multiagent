@@ -1,7 +1,7 @@
 import type { ScenarioId } from "@gcp-sre/shared";
 
-export type SoakJobStatus = "queued" | "running" | "completed" | "failed";
-export type SoakScenarioPhase = "pending" | "running" | "passed" | "failed";
+type SoakJobStatus = "queued" | "running" | "completed" | "failed";
+type SoakScenarioPhase = "pending" | "running" | "passed" | "failed";
 
 export interface SoakScenarioResult {
   scenario: ScenarioId;

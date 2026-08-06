@@ -7,7 +7,6 @@ import { serviceRefFromRun } from "./target.js";
 import type { ToolCallContext } from "./types.js";
 
 const LOGS: Record<string, string[]> = {
-  http_500s: ["POST / -> 500 forced_500", "GET /healthz -> 500 chaos_force_500"],
   missing_config: ["Boot warning: REQUIRED_CONFIG_KEY unset", "GET /healthz -> 503 missing_required_env"],
   bad_revision_traffic: ["Revision patient-bad serving 100% traffic", "GET /healthz -> 503 unhealthy_revision"],
 };

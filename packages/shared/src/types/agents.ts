@@ -1,3 +1,4 @@
+/** Orchestrator + specialist agent names. */
 export type AgentName =
   | "orchestrator"
   | "detector"
@@ -6,6 +7,7 @@ export type AgentName =
   | "mitigator"
   | "scribe";
 
+/** Lifecycle status of an investigation run. */
 export type RunStatus =
   | "queued"
   | "running"

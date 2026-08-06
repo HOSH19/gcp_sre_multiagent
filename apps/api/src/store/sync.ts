@@ -47,4 +47,4 @@ export async function syncTraceToBigQuery(row: Record<string, unknown>): Promise
   }
 }
 
-export { uploadReportArtifact, uploadEvidenceArtifact, uploadRunJsonArtifact } from "./gcs.js";
+export { uploadReportArtifact, uploadEvidenceArtifact } from "./gcs.js";

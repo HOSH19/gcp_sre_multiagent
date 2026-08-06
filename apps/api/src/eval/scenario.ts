@@ -5,7 +5,7 @@ import { startInvestigation } from "../orchestrator/investigate.js";
 import { createRun } from "../store/runs.js";
 import { injectChaosScenario, chaosFetch } from "../tools/chaosClient.js";
 
-export interface EvalScenarioResult {
+interface EvalScenarioResult {
   scenario: ScenarioId;
   ok: boolean;
   matched?: boolean;
@@ -17,7 +17,7 @@ export interface EvalScenarioResult {
   reason?: string;
 }
 
-export async function resetChaos(): Promise<void> {
+async function resetChaos(): Promise<void> {
   await chaosFetch("/reset", { method: "POST" });
 }
 

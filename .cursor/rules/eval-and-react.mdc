@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Eval matching
 
-The eval matcher in `packages/shared/src/eval.ts` uses aliases + fuzzy keyword rules to map free-form ReAct hypothesis labels to canonical scenario root causes (`application_exception_500`, `unhealthy_revision_receiving_traffic`, `missing_required_env`).
+The eval matcher in `packages/shared/src/eval.ts` uses aliases + fuzzy keyword rules to map free-form ReAct hypothesis labels to canonical scenario root causes (`unhealthy_revision_receiving_traffic`, `missing_required_env`).
 
 **Do not keep growing the alias list** to patch individual ReAct phrasings. If new phrasing misses, prefer one of:
 

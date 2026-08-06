@@ -1,6 +1,6 @@
 import { estimateCostUsd } from "@gcp-sre/shared";
 import { config } from "../config.js";
-import type { FunctionDeclaration, LlmContent, LlmResult } from "./types.js";
+import type { FunctionDeclaration, LlmContent, LlmResult, ToolChoiceMode } from "./types.js";
 
 async function accessToken(): Promise<string | null> {
   if (process.env.GCP_ACCESS_TOKEN) return process.env.GCP_ACCESS_TOKEN;
@@ -80,37 +80,47 @@ export async function callVertexWithTools(opts: {
   system: string;
   contents: LlmContent[];
   tools: FunctionDeclaration[];
+  /** Force / allow / disable function calls (default AUTO). */
+  toolChoice?: ToolChoiceMode;
 }): Promise<LlmResult | null> {
   if (config.mode !== "gcp") return null;
   const token = await accessToken();
   if (!token) return null;
 
+  const body: Record<string, unknown> = {
+    systemInstruction: { parts: [{ text: opts.system }] },
+    contents: opts.contents.map((c) => ({
+      role: c.role,
+      parts: c.parts.map((p) => {
+        if (p.functionCall) {
+          return { functionCall: { name: p.functionCall.name, args: p.functionCall.args ?? {} } };
+        }
+        if (p.functionResponse) {
+          return {
+            functionResponse: {
+              name: p.functionResponse.name,
+              response: p.functionResponse.response,
+            },
+          };
+        }
+        return { text: p.text ?? "" };
+      }),
+    })),
+  };
+
+  if (opts.tools.length) {
+    body.tools = [{ functionDeclarations: opts.tools }];
+    body.toolConfig = {
+      functionCallingConfig: {
+        mode: opts.toolChoice ?? "AUTO",
+      },
+    };
+  }
+
   const res = await fetch(vertexUrl(opts.model), {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: opts.system }] },
-      contents: opts.contents.map((c) => ({
-        role: c.role,
-        parts: c.parts.map((p) => {
-          if (p.functionCall) {
-            return { functionCall: { name: p.functionCall.name, args: p.functionCall.args ?? {} } };
-          }
-          if (p.functionResponse) {
-            return {
-              functionResponse: {
-                name: p.functionResponse.name,
-                response: p.functionResponse.response,
-              },
-            };
-          }
-          return { text: p.text ?? "" };
-        }),
-      })),
-      tools: opts.tools.length
-        ? [{ functionDeclarations: opts.tools }]
-        : undefined,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     console.warn("Vertex tools error", res.status, await res.text());

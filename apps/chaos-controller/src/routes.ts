@@ -4,7 +4,7 @@ import { isAuthed } from "./auth.js";
 import { isGcpMode, localState, MODE, PATIENT_SERVICE_URL } from "./config.js";
 import { injectScenario, patchEnv, resetAll, rollbackTraffic } from "./scenarios.js";
 
-const VALID: ScenarioId[] = ["http_500s", "missing_config", "bad_revision_traffic"];
+const VALID: ScenarioId[] = ["missing_config", "bad_revision_traffic"];
 
 export function registerRoutes(app: Hono): void {
   app.get("/health", (c) => c.json({ ok: true, service: "chaos-controller", mode: MODE, gcp: isGcpMode }));

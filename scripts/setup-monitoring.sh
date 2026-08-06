@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT="${PROJECT:-sre-multiagent}"
-REGION="${REGION:-us-central1}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=common.sh
+source "${SCRIPT_DIR}/common.sh"
 
-API_URL="$(gcloud run services describe api --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
-PATIENT_URL="$(gcloud run services describe patient --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
+API_URL="$(run_service_url api)"
+PATIENT_URL="$(run_service_url patient)"
 HOST="$(echo "$PATIENT_URL" | sed -E 's#https://##' | sed -E 's#/.*##')"
 PROJECT_NUMBER="$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')"
 PUSH_USER_SA="pubsub-push@${PROJECT}.iam.gserviceaccount.com"
@@ -88,7 +89,7 @@ EXISTING="$(gcloud alpha monitoring policies list --project="$PROJECT" --filter=
 gcloud alpha monitoring policies create --project="$PROJECT" --policy-from-file=/tmp/alert-policy.json --quiet
 
 gcloud pubsub topics publish sre-incidents --project="$PROJECT" \
-  --message='{"scenario":"http_500s"}' --attribute=scenario=http_500s
+  --message='{"scenario":"missing_config"}' --attribute=scenario=missing_config
 
 cat <<EOF
 

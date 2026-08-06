@@ -44,7 +44,6 @@ export {
   writeBigQueryTrace,
   finalizeRun,
   type ScribeToolArgs,
-  type ScribeToolName,
 } from "./scribe.js";
 export { ensureRemediationProposal } from "./reactTools.js";
 export type { ToolCallContext, ToolHandler } from "./types.js";

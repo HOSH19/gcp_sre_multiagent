@@ -34,7 +34,7 @@ function buildScribeArgs(
  * Persistence order is mandatory (writeReport → writeBigQueryTrace → finalizeRun);
  * buildScribeArgs remains orchestrator-owned so the model cannot skip decision/cost.
  */
-export async function runScribeTools(run: InvestigationRun, args: ScribeToolArgs): Promise<void> {
+async function runScribeTools(run: InvestigationRun, args: ScribeToolArgs): Promise<void> {
   const payload = args as unknown as Record<string, unknown>;
   for (const tool of SCRIBE_TOOL_SEQUENCE) {
     await runTool(run, "scribe", tool, payload);

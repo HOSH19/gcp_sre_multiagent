@@ -21,7 +21,6 @@ async function waitForPatientUnhealthy(opts: {
       const res = await fetch(healthUrl, { signal: AbortSignal.timeout(5_000) });
       if (!res.ok) return true;
     } catch {
-      // network error → patient unreachable; treat as unhealthy
       return true;
     }
     await new Promise((r) => setTimeout(r, intervalMs));

@@ -28,6 +28,9 @@ export interface FunctionDeclaration {
   parameters: Record<string, unknown>;
 }
 
+/** Vertex functionCallingConfig.mode — ANY forces a function call. */
+export type ToolChoiceMode = "AUTO" | "ANY" | "NONE";
+
 export function mockLlm(model: string, system: string, prompt: string, mockText?: string): LlmResult {
   const text = mockText ?? JSON.stringify({ summary: "Local mock LLM response" });
   const tokensIn = Math.ceil((system.length + prompt.length) / 4);

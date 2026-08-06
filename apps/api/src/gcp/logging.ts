@@ -71,14 +71,6 @@ export async function queryServiceLogs(opts?: {
   }));
 }
 
-/** @deprecated Prefer queryServiceLogs */
-export async function queryPatientLogs(opts?: {
-  filterExtra?: string;
-  pageSize?: number;
-}): Promise<Array<{ timestamp?: string; severity?: string; message: string; revision?: string }>> {
-  return queryServiceLogs(opts);
-}
-
 export async function queryServiceErrors(
   opts?: { pageSize?: number; serviceName?: string; projectId?: string; region?: string },
 ): Promise<Array<{ message: string; count: number }>> {
@@ -97,9 +89,4 @@ export async function queryServiceErrors(
   const errors = [...counts.entries()].map(([message, count]) => ({ message, count }));
   if (!errors.length) return [{ message: "No recent error-severity log entries", count: 0 }];
   return errors;
-}
-
-/** @deprecated Prefer queryServiceErrors */
-export async function queryPatientErrors(pageSize = 30): Promise<Array<{ message: string; count: number }>> {
-  return queryServiceErrors({ pageSize });
 }

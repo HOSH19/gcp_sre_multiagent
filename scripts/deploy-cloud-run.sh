@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT="${PROJECT:-sre-multiagent}"
-REGION="${REGION:-us-central1}"
-REPO="${REGION}-docker.pkg.dev/${PROJECT}/sre-agents"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=common.sh
+source "${SCRIPT_DIR}/common.sh"
+
 SKIP_BUILD="${SKIP_BUILD:-0}"
 
 gcloud config set project "$PROJECT"
@@ -37,7 +38,6 @@ gcloud secrets add-iam-policy-binding chaos-admin-token \
   --member="serviceAccount:${COMPUTE_SA}" \
   --role="roles/secretmanager.secretAccessor" --quiet
 
-# Optional paging secrets (create if missing; mount when versions exist).
 for SECRET in slack-webhook-url pagerduty-routing-key; do
   gcloud secrets describe "$SECRET" --project="$PROJECT" >/dev/null 2>&1 || \
     gcloud secrets create "$SECRET" --project="$PROJECT" --replication-policy=automatic --quiet
@@ -60,8 +60,8 @@ gcloud run deploy patient \
   --set-secrets="CHAOS_ADMIN_TOKEN=chaos-admin-token:latest" \
   --quiet
 
-PATIENT_URL="$(gcloud run services describe patient --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
-GOOD_REVISION="$(gcloud run services describe patient --project="$PROJECT" --region="$REGION" --format='value(status.latestReadyRevisionName)')"
+PATIENT_URL="$(run_service_url patient)"
+GOOD_REVISION="$(run_service_revision patient status.latestReadyRevisionName)"
 echo "PATIENT_URL=$PATIENT_URL"
 echo "GOOD_REVISION=$GOOD_REVISION"
 
@@ -74,11 +74,9 @@ gcloud run deploy patient \
   --update-env-vars="IS_BAD_REVISION=true" \
   --quiet
 
-BAD_REVISION="$(gcloud run services describe patient --project="$PROJECT" --region="$REGION" --format='value(status.latestCreatedRevisionName)')"
+BAD_REVISION="$(run_service_revision patient status.latestCreatedRevisionName)"
 echo "BAD_REVISION=$BAD_REVISION"
 
-# Restore service *template* to healthy env so later env patches don't inherit IS_BAD_REVISION=true.
-# Creates an unused revision at 0% traffic; pinned GOOD_REVISION keeps serving.
 echo "==> Restore healthy service template (no traffic change to good)"
 gcloud run deploy patient \
   --project="$PROJECT" --region="$REGION" \
@@ -92,7 +90,6 @@ gcloud run services update-traffic patient \
   --to-revisions="${GOOD_REVISION}=100" \
   --quiet
 
-# Chaos-controller mutates patient via Cloud Run Admin API
 gcloud projects add-iam-policy-binding "$PROJECT" \
   --member="serviceAccount:${COMPUTE_SA}" \
   --role="roles/run.developer" --quiet >/dev/null || true
@@ -107,7 +104,7 @@ gcloud run deploy chaos-controller \
   --set-secrets="CHAOS_ADMIN_TOKEN=chaos-admin-token:latest" \
   --quiet
 
-CHAOS_URL="$(gcloud run services describe chaos-controller --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
+CHAOS_URL="$(run_service_url chaos-controller)"
 echo "CHAOS_URL=$CHAOS_URL"
 
 gcloud run services add-iam-policy-binding chaos-controller \
@@ -122,7 +119,6 @@ if [[ -n "${WEB_ORIGIN_DEFAULT}" ]]; then
 fi
 
 API_SECRETS="CHAOS_ADMIN_TOKEN=chaos-admin-token:latest"
-# Mount paging secrets only when a version exists (fail-open deploy without them).
 if gcloud secrets versions list slack-webhook-url --project="$PROJECT" --limit=1 --format='value(name)' 2>/dev/null | grep -q .; then
   API_SECRETS="${API_SECRETS},SLACK_WEBHOOK_URL=slack-webhook-url:latest"
 fi
@@ -130,7 +126,6 @@ if gcloud secrets versions list pagerduty-routing-key --project="$PROJECT" --lim
   API_SECRETS="${API_SECRETS},PAGERDUTY_ROUTING_KEY=pagerduty-routing-key:latest"
 fi
 
-# --no-cpu-throttling: investigation continues after /investigate returns (background work).
 gcloud run deploy api \
   --project="$PROJECT" --region="$REGION" \
   --image="${REPO}/api:latest" \
@@ -141,22 +136,13 @@ gcloud run deploy api \
   --set-secrets="${API_SECRETS}" \
   --quiet
 
-API_URL="$(gcloud run services describe api --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
+API_URL="$(run_service_url api)"
 
-gcloud projects add-iam-policy-binding "$PROJECT" \
-  --member="serviceAccount:${COMPUTE_SA}" \
-  --role="roles/aiplatform.user" --quiet >/dev/null || true
-gcloud projects add-iam-policy-binding "$PROJECT" \
-  --member="serviceAccount:${COMPUTE_SA}" \
-  --role="roles/logging.viewer" --quiet >/dev/null || true
-# API reads Cloud Run revision/traffic/env
-gcloud projects add-iam-policy-binding "$PROJECT" \
-  --member="serviceAccount:${COMPUTE_SA}" \
-  --role="roles/run.viewer" --quiet >/dev/null || true
-# API reads Cloud Monitoring uptime checks / time series
-gcloud projects add-iam-policy-binding "$PROJECT" \
-  --member="serviceAccount:${COMPUTE_SA}" \
-  --role="roles/monitoring.viewer" --quiet >/dev/null || true
+for ROLE in roles/aiplatform.user roles/logging.viewer roles/run.viewer roles/monitoring.viewer; do
+  gcloud projects add-iam-policy-binding "$PROJECT" \
+    --member="serviceAccount:${COMPUTE_SA}" \
+    --role="$ROLE" --quiet >/dev/null || true
+done
 
 gcloud run services add-iam-policy-binding api \
   --project="$PROJECT" --region="$REGION" \

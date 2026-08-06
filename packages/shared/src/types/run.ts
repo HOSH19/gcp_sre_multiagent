@@ -1,32 +1,12 @@
 import type { ScenarioId } from "../scenarios.js";
-import type { AgentName, RunStatus } from "./agents.js";
+import type { RunStatus } from "./agents.js";
 import type { EvidenceItem, HypothesisItem } from "./evidence.js";
+import type { AgentEvent } from "./event.js";
 import type { MappedAlert } from "./registry.js";
-import type { RemediationAction, RemediationProposal } from "./remediation.js";
+import type { RemediationProposal } from "./remediation.js";
+import type { IncidentReport } from "./report.js";
 
-export interface IncidentReport {
-  runId: string;
-  timeline: Array<{ at: string; message: string; agent?: AgentName }>;
-  evidence: EvidenceItem[];
-  hypotheses: HypothesisItem[];
-  ruledOut: string[];
-  proposedRemediation: RemediationProposal | null;
-  approval: {
-    decision: "approved" | "denied" | "pending" | "none";
-    at?: string;
-    executedActions?: RemediationAction[];
-  };
-  cost: {
-    totalUsd: number;
-    totalTokensIn: number;
-    totalTokensOut: number;
-    modelBreakdown: Record<string, { usd: number; tokensIn: number; tokensOut: number }>;
-  };
-  healthAfter?: { ok: boolean; detail: string };
-  expectedScenario?: ScenarioId;
-  eval?: { matched: boolean; expected: string; predicted: string };
-}
-
+/** Mutable investigation state persisted for a single run. */
 export interface InvestigationRun {
   id: string;
   status: RunStatus;
@@ -61,17 +41,4 @@ export interface InvestigationRun {
   leaseExpiresAt?: string;
   /** Structured alert that triggered this run (or latest correlated alert). */
   alert?: MappedAlert;
-}
-
-export interface AgentEvent {
-  id: string;
-  runId: string;
-  agent: AgentName;
-  type: "thought" | "tool_call" | "tool_result" | "status" | "error";
-  message: string;
-  data?: unknown;
-  at: string;
-  costUsdDelta?: number;
-  tokensIn?: number;
-  tokensOut?: number;
 }

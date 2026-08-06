@@ -36,7 +36,7 @@ const SPECIAL_DECLS: Record<string, FunctionDeclaration> = {
   submitHypotheses: {
     name: "submitHypotheses",
     description:
-      "Submit ranked root-cause hypotheses. rootCauseLabel is a free-form string. Call this when ready to conclude.",
+      "Submit ranked root-cause hypotheses. Set rootCauseLabel to free-form text and canonicalRootCause to a known scenario id when applicable. Call this when ready to conclude.",
     parameters: {
       type: "object",
       properties: {
@@ -45,7 +45,12 @@ const SPECIAL_DECLS: Record<string, FunctionDeclaration> = {
           items: {
             type: "object",
             properties: {
-              rootCauseLabel: { type: "string", description: "Free-form root cause label" },
+              rootCauseLabel: { type: "string", description: "Free-form human-readable root cause label" },
+              canonicalRootCause: {
+                type: "string",
+                description:
+                  "Canonical id when applicable: unhealthy_revision_receiving_traffic | missing_required_env. Free-form or omit when unknown.",
+              },
               confidence: { type: "number", description: "0-1 confidence" },
               summary: { type: "string" },
               evidenceIds: { type: "array", items: { type: "string" } },
@@ -77,7 +82,7 @@ const SPECIAL_DECLS: Record<string, FunctionDeclaration> = {
               details: {
                 type: "object",
                 description:
-                  "For patch_env, use actual env var keys and values, e.g. {\"APP_SECRET\":\"restore-known-good\"} or {\"FORCE_500\":\"false\"}.",
+                  "For patch_env, use actual env var keys and values, e.g. {\"APP_SECRET\":\"restore-known-good\"}.",
                 additionalProperties: { type: "string" },
               },
             },

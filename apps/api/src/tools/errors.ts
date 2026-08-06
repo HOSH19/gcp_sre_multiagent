@@ -7,7 +7,6 @@ import { serviceRefFromRun } from "./target.js";
 import type { ToolCallContext } from "./types.js";
 
 const ERRORS: Record<string, Array<{ message: string; count: number }>> = {
-  http_500s: [{ message: "Error: forced_500 from chaos endpoint", count: 42 }],
   missing_config: [{ message: "Misconfigured: APP_SECRET missing", count: 18 }],
   bad_revision_traffic: [{ message: "Revision failed readiness: unhealthy_revision", count: 27 }],
 };

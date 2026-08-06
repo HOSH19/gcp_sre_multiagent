@@ -1,6 +1,6 @@
 import { GoogleAuth } from "google-auth-library";
 
-export type CloudRunConfig = {
+type CloudRunConfig = {
   projectId: string;
   region: string;
   serviceName: string;
@@ -35,7 +35,7 @@ function serviceResource(cfg: CloudRunConfig): string {
   return `projects/${cfg.projectId}/locations/${cfg.region}/services/${cfg.serviceName}`;
 }
 
-export function shortRevision(name: string): string {
+function shortRevision(name: string): string {
   const parts = name.split("/");
   return parts[parts.length - 1] ?? name;
 }
@@ -90,26 +90,6 @@ export async function getService(cfg: CloudRunConfig): Promise<Service> {
   return (await res.json()) as Service;
 }
 
-export async function listRevisionNames(cfg: CloudRunConfig): Promise<string[]> {
-  const parent = serviceResource(cfg);
-  const res = await runFetch(`${parent}/revisions?pageSize=50`);
-  if (!res.ok) throw new Error(`listRevisions failed (${res.status}): ${await res.text()}`);
-  const body = (await res.json()) as { revisions?: Array<{ name?: string }> };
-  return (body.revisions ?? []).map((r) => shortRevision(r.name ?? "")).filter(Boolean);
-}
-
-export async function getRevisionEnv(cfg: CloudRunConfig, revisionName: string): Promise<Record<string, string>> {
-  const name = `${serviceResource(cfg)}/revisions/${shortRevision(revisionName)}`;
-  const res = await runFetch(name);
-  if (!res.ok) throw new Error(`getRevision failed (${res.status}): ${await res.text()}`);
-  const body = (await res.json()) as { containers?: Container[] };
-  const out: Record<string, string> = {};
-  for (const e of body.containers?.[0]?.env ?? []) {
-    if (e.name && e.value != null) out[e.name] = e.value;
-  }
-  return out;
-}
-
 export function trafficMap(service: Service): Record<string, number> {
   const out: Record<string, number> = {};
   for (const t of service.traffic ?? []) {
@@ -123,7 +103,7 @@ export function trafficMap(service: Service): Record<string, number> {
   return out;
 }
 
-export function serviceEnv(service: Service): Record<string, string> {
+function serviceEnv(service: Service): Record<string, string> {
   const env = service.template?.containers?.[0]?.env ?? [];
   const out: Record<string, string> = {};
   for (const e of env) {

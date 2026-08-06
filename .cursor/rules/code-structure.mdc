@@ -1,0 +1,44 @@
+---
+description: Code structure principles — no dead code, short functions/files, separation of concerns, comment style
+alwaysApply: true
+---
+
+# Code structure
+
+## Principles
+
+1. **No dead code** — Remove unused exports, functions, files, imports, and unreachable branches. Do not leave "just in case" helpers.
+2. **Short functions** — Prefer small, single-purpose functions. Extract when a function does multiple things or exceeds ~40–50 lines.
+3. **Short files** — Prefer focused modules with one clear responsibility. Split large files by concern.
+4. **Separation of concerns** — Keep layers distinct:
+   - **api**: `routes/` vs `orchestrator/` vs `tools/` vs `store/` vs `gcp/` vs `llm/`
+   - **web**: components vs `hooks/` vs `lib/api.ts` (API client)
+   - **shared**: types and pure helpers only — no runtime GCP/LLM clients
+5. **Comments** — No single-line `//` comments. Use JSDoc/docstrings only on non-obvious public functions.
+
+## Good vs bad (this monorepo)
+
+```
+# ❌ BAD — god file mixing layers
+apps/api/src/investigateEverything.ts   # GCP client + ReAct loop + route handler
+
+# ✅ GOOD — one concern per module
+apps/api/src/gcp/cloudRun.ts            # Cloud Run client only
+apps/api/src/orchestrator/react.ts      # ReAct loop only
+apps/api/src/routes/actions.ts          # HTTP handlers only
+
+# ❌ BAD — UI fetching + formatting + rendering in one component
+apps/web/src/components/Console.tsx
+
+# ✅ GOOD
+apps/web/src/hooks/useConsole.ts        # state / polling
+apps/web/src/lib/api.ts                 # fetch helpers
+apps/web/src/components/Timeline.tsx    # presentational
+
+# ❌ BAD — shared package importing Vertex or Firestore
+packages/shared/src/vertexClient.ts
+
+# ✅ GOOD
+packages/shared/src/types/evidence.ts   # shared types
+packages/shared/src/eval.ts             # pure matching helpers
+```

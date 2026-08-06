@@ -1,6 +1,5 @@
 import {
   nowIso,
-  type MappedAlert,
   type ServiceRegistry,
   type ServiceRegistryEntry,
 } from "@gcp-sre/shared";
@@ -88,7 +87,7 @@ function fromEnv(): ServiceRegistry | null {
 }
 
 /** Default local/demo registry: chaos-lab patient only. */
-export function defaultServiceRegistry(): ServiceRegistry {
+function defaultServiceRegistry(): ServiceRegistry {
   return {
     version: 1,
     updatedAt: nowIso(),
@@ -178,4 +177,4 @@ export async function registryEntryForRun(run: {
   };
 }
 
-export type { MappedAlert, ServiceRegistry, ServiceRegistryEntry };
+export type { ServiceRegistry, ServiceRegistryEntry };

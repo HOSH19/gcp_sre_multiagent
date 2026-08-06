@@ -21,5 +21,4 @@ export {
   syncTraceToBigQuery,
   uploadReportArtifact,
   uploadEvidenceArtifact,
-  uploadRunJsonArtifact,
 } from "./sync.js";

@@ -31,8 +31,6 @@ export interface ScribeToolArgs {
 /** Fixed tool order until P2 ReAct selects tools. */
 export const SCRIBE_TOOL_SEQUENCE = ["writeReport", "writeBigQueryTrace", "finalizeRun"] as const;
 
-export type ScribeToolName = (typeof SCRIBE_TOOL_SEQUENCE)[number];
-
 function requireScribeArgs(ctx: ToolCallContext): ScribeToolArgs {
   const args = ctx.args as Partial<ScribeToolArgs> | undefined;
   if (!args?.decision) {
@@ -44,8 +42,13 @@ function requireScribeArgs(ctx: ToolCallContext): ScribeToolArgs {
   return args as ScribeToolArgs;
 }
 
+/** Prefer agent-emitted canonical id; fall back to free-form label for older runs. */
 function predictedRootCause(run: InvestigationRun): string {
-  return run.hypotheses[0]?.rootCauseLabel ?? "unknown";
+  const top = run.hypotheses[0];
+  if (!top) return "unknown";
+  const canonical = top.canonicalRootCause?.trim();
+  if (canonical) return canonical;
+  return top.rootCauseLabel || "unknown";
 }
 
 /** Compose IncidentReport, persist it, and upload GCS artifacts when durable. */

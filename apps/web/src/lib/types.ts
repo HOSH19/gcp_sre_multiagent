@@ -1,5 +1,6 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api/backend";
 
+/** Scenario ids the API may return (includes legacy). */
 export type ScenarioId = "http_500s" | "missing_config" | "bad_revision_traffic";
 
 export interface AgentEvent {
@@ -44,38 +45,12 @@ export interface Run {
   error?: string;
 }
 
-export type SoakScenarioPhase = "pending" | "running" | "passed" | "failed";
-
-export interface SoakScenarioResult {
-  scenario: ScenarioId;
-  phase: SoakScenarioPhase;
-  ok?: boolean;
-  matched?: boolean;
-  healthy?: boolean;
-  predicted?: string;
-  expected?: string;
-  costUsd?: number;
-  runId?: string;
-  reason?: string;
-}
-
-export interface SoakJob {
-  id: string;
-  status: "queued" | "running" | "completed" | "failed";
-  createdAt: string;
-  updatedAt: string;
-  autoApprove: true;
-  currentScenario: ScenarioId | null;
-  currentRunId: string | null;
-  results: SoakScenarioResult[];
-  passed: number;
-  total: number;
-  totalCostUsd: number;
-  error?: string;
-}
-
-export const SCENARIO_OPTIONS: { id: ScenarioId; label: string }[] = [
-  { id: "http_500s", label: "HTTP 500s" },
+/** UI-selectable scenarios (http_500s removed from the demo surface). */
+export const SCENARIO_OPTIONS: { id: Exclude<ScenarioId, "http_500s">; label: string }[] = [
   { id: "missing_config", label: "Missing config" },
   { id: "bad_revision_traffic", label: "Bad revision traffic" },
 ];
+
+export function scenarioLabel(scenario: string): string {
+  return SCENARIO_OPTIONS.find((s) => s.id === scenario)?.label ?? scenario;
+}

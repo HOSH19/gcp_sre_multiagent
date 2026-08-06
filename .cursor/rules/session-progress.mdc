@@ -1,0 +1,27 @@
+---
+description: Aug 6 2026 session progress — done work and next priorities for gcp-sre-agents
+alwaysApply: true
+---
+
+# Session progress (Aug 6, 2026)
+
+Keep `eval-and-react.mdc` and `code-structure.mdc`. Do **not** grow fuzzy eval aliases — prefer `canonicalRootCause` on `HypothesisItem` / `submitHypotheses`.
+
+## Done this morning
+
+- Restarted GCP demo stack; redeployed API with `canonicalRootCause`; eval prefers canonical over fuzzy aliases
+- Shortened README toward prior style
+- Repo cleanup: `code-structure.mdc`; dead code removal; short files / SoC splits across api, web, shared
+- Removed `http_500s` scenario; remaining: `missing_config`, `bad_revision_traffic`
+- Removed soak UI; redesigned console: Investigate | Hypotheses | Report top row; agent board 3+2; fixed top-row height; nested event chips
+- Header: "GCP SRE Agents" + MVP description (two lines); removed API health line
+- Fixed chip truncation (numbered lists); forced Vertex ReAct function calling (ANY mode) for specialists
+- Vitest suite: `npm test` (unit tests, no live GCP)
+- Proxy: use `nohup` for durable local `gcloud run services proxy web` on `:8080`
+
+## Future work (user-requested)
+
+1. **Latency between agents** — speed up handoffs, parallelize where safe, reduce ReAct round-trips
+2. **Agent log observability** — monitor tool calls, fallbacks, and Vertex text-only retries so each agent’s behavior is verifiable
+
+Do not shut down the GCP demo stack unless the user asks.

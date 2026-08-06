@@ -18,9 +18,12 @@ function parseHypotheses(raw: unknown): HypothesisItem[] {
     const evidenceIds = Array.isArray(obj.evidenceIds)
       ? obj.evidenceIds.filter((x): x is string => typeof x === "string")
       : [];
+    const canonicalRaw =
+      typeof obj.canonicalRootCause === "string" ? obj.canonicalRootCause.trim() : "";
     out.push({
       id: typeof obj.id === "string" ? obj.id : newId("hyp"),
       rootCauseLabel: label,
+      ...(canonicalRaw ? { canonicalRootCause: canonicalRaw } : {}),
       confidence,
       summary,
       evidenceIds,
@@ -30,7 +33,7 @@ function parseHypotheses(raw: unknown): HypothesisItem[] {
   return out;
 }
 
-/** ReAct terminal tool — free-form rootCauseLabel. */
+/** ReAct terminal tool — free-form rootCauseLabel plus optional canonicalRootCause. */
 export async function submitHypotheses(ctx: ToolCallContext): Promise<unknown> {
   const { run, args } = ctx;
   const hypotheses = parseHypotheses(args?.hypotheses);

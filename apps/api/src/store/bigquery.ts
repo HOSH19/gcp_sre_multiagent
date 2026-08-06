@@ -11,10 +11,6 @@ function getBigQuery(): BigQuery {
   return client;
 }
 
-export function resetBigQueryClient(): void {
-  client = null;
-}
-
 export interface InvestigationTraceRow {
   runId: string;
   status?: string | null;

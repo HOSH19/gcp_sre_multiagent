@@ -10,23 +10,16 @@ function getStorage(): Storage {
   return client;
 }
 
-export function resetStorageClient(): void {
-  client = null;
-}
-
-export function artifactsBucketName(): string {
+function artifactsBucketName(): string {
   return config.artifactsBucket;
 }
 
-export function runArtifactGsUri(runId: string, objectName: string): string {
+function runArtifactGsUri(runId: string, objectName: string): string {
   return `gs://${artifactsBucketName()}/runs/${runId}/${objectName}`;
 }
 
-/**
- * Upload a JSON artifact under gs://{bucket}/runs/{runId}/{objectName}.
- * Returns the gs:// URI.
- */
-export async function uploadRunJsonArtifact(
+/** Upload a JSON artifact under gs://{bucket}/runs/{runId}/{objectName}. */
+async function uploadRunJsonArtifact(
   runId: string,
   objectName: string,
   data: unknown,

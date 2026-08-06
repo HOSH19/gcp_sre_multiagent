@@ -17,7 +17,14 @@ function pushHyp(
   summary: string,
   evidenceIds: string[],
 ) {
-  list.push({ id: newId("hyp"), rootCauseLabel: label, confidence, summary, evidenceIds });
+  list.push({
+    id: newId("hyp"),
+    rootCauseLabel: label,
+    canonicalRootCause: label,
+    confidence,
+    summary,
+    evidenceIds,
+  });
 }
 
 export function inferHypotheses(run: InvestigationRun): { hypotheses: HypothesisItem[]; ruledOut: string[] } {
@@ -66,18 +73,9 @@ export function inferHypotheses(run: InvestigationRun): { hypotheses: Hypothesis
       ids("getRevisionTraffic", "listRevisions", "getServiceHealth"),
     );
   }
-  if (health?.patient?.reason === "chaos_force_500" || active === "http_500s") {
-    pushHyp(
-      hypotheses,
-      "application_exception_500",
-      health?.patient?.reason === "chaos_force_500" ? 0.94 : 0.87,
-      "Application returning forced HTTP 500s.",
-      ids("queryLogs", "listRecentErrors", "getServiceHealth"),
-    );
-  }
 
   hypotheses.sort((a, b) => b.confidence - a.confidence);
-  const labels = ["missing_required_env", "unhealthy_revision_receiving_traffic", "application_exception_500"];
+  const labels = ["missing_required_env", "unhealthy_revision_receiving_traffic"];
   const ruledOut = labels.filter((l) => !hypotheses.some((h) => h.rootCauseLabel === l));
   if (!hypotheses.length) {
     pushHyp(hypotheses, "unknown", 0.4, "Insufficient evidence.", run.evidence.map((e) => e.id));

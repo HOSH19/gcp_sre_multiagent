@@ -1,5 +1,5 @@
 /** Pager / notification policy (Slack webhook + PagerDuty Events API v2). */
-export interface PagerPolicy {
+interface PagerPolicy {
   /** Slack channel id or name (hint in webhook message; webhook URL is global). */
   slackChannel?: string;
   /** Optional per-service PagerDuty Events API v2 routing key (overrides PAGERDUTY_ROUTING_KEY). */

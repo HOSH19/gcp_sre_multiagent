@@ -2,14 +2,15 @@ import type { InvestigationRun } from "@gcp-sre/shared";
 import { config } from "../config.js";
 import { registryEntryForRun } from "../fleet/registry.js";
 import { notifyPagerDuty } from "./pagerduty.js";
-import { approvalDeepLink, notifySlack } from "./slack.js";
+import { approvalDeepLink } from "./links.js";
+import { notifySlack } from "./slack.js";
 import type { NotifyResult, NotifyStatus } from "./types.js";
 
 /**
  * Send Slack / PagerDuty notifications for approval and terminal statuses.
  * Fail-open: never throws to callers; local / missing secrets → noop.
  */
-export async function notifyRunStatus(
+async function notifyRunStatus(
   run: InvestigationRun,
   status: NotifyStatus,
   summary?: string,

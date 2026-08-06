@@ -1,19 +1,15 @@
-export type ScenarioId = "http_500s" | "missing_config" | "bad_revision_traffic";
+/** Demo / eval scenario identifiers. */
+export type ScenarioId = "missing_config" | "bad_revision_traffic";
 
-export interface ScenarioDef {
+interface ScenarioDef {
   id: ScenarioId;
   label: string;
   expectedRootCause: string;
   description: string;
 }
 
+/** Canonical chaos scenarios and their expected root-cause labels. */
 export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
-  http_500s: {
-    id: "http_500s",
-    label: "HTTP 500s",
-    expectedRootCause: "application_exception_500",
-    description: "Patient app returns forced HTTP 500 responses.",
-  },
   missing_config: {
     id: "missing_config",
     label: "Missing config",

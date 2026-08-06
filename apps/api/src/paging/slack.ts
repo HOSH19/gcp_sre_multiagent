@@ -1,10 +1,6 @@
 import { config } from "../config.js";
+import { approvalDeepLink } from "./links.js";
 import type { NotifyContext, NotifyResult } from "./types.js";
-
-function approvalDeepLink(runId: string): string {
-  const base = config.webOrigin.replace(/\/$/, "");
-  return `${base}/?runId=${encodeURIComponent(runId)}`;
-}
 
 /** Post a Slack incoming-webhook message. No-ops when webhook unset or paging disabled. */
 export async function notifySlack(ctx: NotifyContext): Promise<NotifyResult["slack"]> {
@@ -55,4 +51,3 @@ export async function notifySlack(ctx: NotifyContext): Promise<NotifyResult["sla
   }
 }
 
-export { approvalDeepLink };

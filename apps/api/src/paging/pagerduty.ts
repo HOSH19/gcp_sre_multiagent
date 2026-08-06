@@ -1,6 +1,6 @@
 import { config } from "../config.js";
+import { approvalDeepLink } from "./links.js";
 import type { NotifyContext, NotifyResult } from "./types.js";
-import { approvalDeepLink } from "./slack.js";
 
 const PD_ENQUEUE = "https://events.pagerduty.com/v2/enqueue";
 
