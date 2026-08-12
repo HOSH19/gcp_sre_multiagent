@@ -20,13 +20,21 @@ const ROOT_CAUSE_ALIASES: Record<string, CanonicalRootCause> = {
   required_env_missing: "missing_required_env",
 };
 
+function trimUnderscores(s: string): string {
+  let start = 0;
+  let end = s.length;
+  while (start < end && s[start] === "_") start++;
+  while (end > start && s[end - 1] === "_") end--;
+  return s.slice(start, end);
+}
+
 function normalizeRootCauseLabel(label: string): string {
-  return label
+  const normalized = label
     .trim()
     .toLowerCase()
     .replace(/['"]/g, "")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+    .replace(/[^a-z0-9]+/g, "_");
+  return trimUnderscores(normalized);
 }
 
 /** Map a free-form label to a known canonical id when an alias matches. */
