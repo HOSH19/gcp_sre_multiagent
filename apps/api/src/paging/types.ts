@@ -1,6 +1,6 @@
 import type { InvestigationRun, RunStatus, ServiceRegistryEntry } from "@gcp-sre/shared";
 
-/** Statuses that trigger outbound paging / chat notifications. */
+/** Statuses that trigger outbound paging notifications. */
 export type NotifyStatus = Extract<
   RunStatus,
   "awaiting_approval" | "completed" | "denied" | "failed"
@@ -15,7 +15,6 @@ export interface NotifyContext {
 }
 
 export interface NotifyResult {
-  slack: "sent" | "skipped" | "failed" | "noop";
   pagerDuty: "sent" | "skipped" | "failed" | "noop";
   detail?: string;
 }

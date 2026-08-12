@@ -21,9 +21,8 @@ Local eval (`MODE=local`, `npm run eval`) keeps using the default `dev-chaos-tok
 
 | Env | Purpose |
 |---|---|
-| `SLACK_WEBHOOK_URL` | Slack Incoming Webhook (global; registry `pagerPolicy.slackChannel` is a message hint). |
 | `PAGERDUTY_ROUTING_KEY` | PagerDuty Events API v2 routing key (global default). |
-| `PAGING` | Force on/off. Default: off in `MODE=local`; on in `MODE=gcp` when either secret is set. |
+| `PAGING` | Force on/off. Default: off in `MODE=local`; on in `MODE=gcp` when routing key is set. |
 | `WEB_ORIGIN` | Base URL for approval deep-links (`/?runId=`). |
 
 Per-service overrides: registry `pagerPolicy.pagerDutyServiceKey` and `severity`.

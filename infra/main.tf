@@ -135,14 +135,6 @@ resource "google_secret_manager_secret_version" "chaos_token" {
 }
 
 # Optional paging secrets — create empty placeholders; populate versions out-of-band.
-resource "google_secret_manager_secret" "slack_webhook" {
-  secret_id = "slack-webhook-url"
-  replication {
-    auto {}
-  }
-  depends_on = [google_project_service.apis]
-}
-
 resource "google_secret_manager_secret" "pagerduty_routing_key" {
   secret_id = "pagerduty-routing-key"
   replication {
@@ -192,10 +184,6 @@ output "bigquery_dataset" {
 
 output "artifacts_bucket" {
   value = google_storage_bucket.artifacts.name
-}
-
-output "slack_webhook_secret" {
-  value = google_secret_manager_secret.slack_webhook.secret_id
 }
 
 output "pagerduty_routing_key_secret" {

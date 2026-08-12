@@ -84,7 +84,7 @@ describe("executableActionsFromProposal", () => {
       risk: "y",
       actions: [
         { type: "patch_env", reason: "r", details: { APP_SECRET: "local-secret" } },
-        { type: "notify_slack", reason: "r", details: {} },
+        { type: "restart_service", reason: "r", details: {} },
       ],
     });
     expect(actions).toHaveLength(1);

@@ -38,7 +38,7 @@ gcloud secrets add-iam-policy-binding chaos-admin-token \
   --member="serviceAccount:${COMPUTE_SA}" \
   --role="roles/secretmanager.secretAccessor" --quiet
 
-for SECRET in slack-webhook-url pagerduty-routing-key; do
+for SECRET in pagerduty-routing-key; do
   gcloud secrets describe "$SECRET" --project="$PROJECT" >/dev/null 2>&1 || \
     gcloud secrets create "$SECRET" --project="$PROJECT" --replication-policy=automatic --quiet
   gcloud secrets add-iam-policy-binding "$SECRET" \
@@ -119,9 +119,6 @@ if [[ -n "${WEB_ORIGIN_DEFAULT}" ]]; then
 fi
 
 API_SECRETS="CHAOS_ADMIN_TOKEN=chaos-admin-token:latest"
-if gcloud secrets versions list slack-webhook-url --project="$PROJECT" --limit=1 --format='value(name)' 2>/dev/null | grep -q .; then
-  API_SECRETS="${API_SECRETS},SLACK_WEBHOOK_URL=slack-webhook-url:latest"
-fi
 if gcloud secrets versions list pagerduty-routing-key --project="$PROJECT" --limit=1 --format='value(name)' 2>/dev/null | grep -q .; then
   API_SECRETS="${API_SECRETS},PAGERDUTY_ROUTING_KEY=pagerduty-routing-key:latest"
 fi

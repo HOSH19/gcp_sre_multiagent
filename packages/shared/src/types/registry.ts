@@ -1,7 +1,5 @@
-/** Pager / notification policy (Slack webhook + PagerDuty Events API v2). */
+/** Pager / notification policy (PagerDuty Events API v2). */
 interface PagerPolicy {
-  /** Slack channel id or name (hint in webhook message; webhook URL is global). */
-  slackChannel?: string;
   /** Optional per-service PagerDuty Events API v2 routing key (overrides PAGERDUTY_ROUTING_KEY). */
   pagerDutyServiceKey?: string;
   /** Default severity hint for PagerDuty triggers. */
@@ -22,7 +20,7 @@ export interface ServiceRegistryEntry {
   uptimeCheckId?: string;
   /** When true, this entry is the chaos-lab patient (demo inject allowed). */
   chaosLab?: boolean;
-  /** Slack / PagerDuty policy for approval + terminal notifications. */
+  /** PagerDuty policy for approval + terminal notifications. */
   pagerPolicy?: PagerPolicy;
   /** Optional playbook / investigation hints for alert correlation. */
   playbookHints?: string[];

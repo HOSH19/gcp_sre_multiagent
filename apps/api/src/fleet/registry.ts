@@ -23,8 +23,6 @@ function patientEntry(): ServiceRegistryEntry {
     ],
     pagerPolicy: {
       severity: "warning",
-      slackChannel: undefined,
-      pagerDutyServiceKey: undefined,
     },
   };
 }

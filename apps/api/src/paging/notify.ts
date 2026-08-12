@@ -3,11 +3,10 @@ import { config } from "../config.js";
 import { registryEntryForRun } from "../fleet/registry.js";
 import { notifyPagerDuty } from "./pagerduty.js";
 import { approvalDeepLink } from "./links.js";
-import { notifySlack } from "./slack.js";
 import type { NotifyResult, NotifyStatus } from "./types.js";
 
 /**
- * Send Slack / PagerDuty notifications for approval and terminal statuses.
+ * Send PagerDuty notifications for approval and terminal statuses.
  * Fail-open: never throws to callers; local / missing secrets → noop.
  */
 async function notifyRunStatus(
@@ -16,7 +15,7 @@ async function notifyRunStatus(
   summary?: string,
 ): Promise<NotifyResult> {
   if (!config.pagingEnabled) {
-    return { slack: "noop", pagerDuty: "noop", detail: "paging disabled" };
+    return { pagerDuty: "noop", detail: "paging disabled" };
   }
 
   let registryEntry;
@@ -27,17 +26,14 @@ async function notifyRunStatus(
   }
 
   const ctx = { run, status, summary, registryEntry };
-  const [slack, pagerDuty] = await Promise.all([notifySlack(ctx), notifyPagerDuty(ctx)]);
+  const pagerDuty = await notifyPagerDuty(ctx);
   const result: NotifyResult = {
-    slack,
     pagerDuty,
     detail: `deepLink=${approvalDeepLink(run.id)}`,
   };
 
-  if (slack === "sent" || pagerDuty === "sent") {
-    console.log(
-      `[paging] run=${run.id} status=${status} slack=${slack} pagerDuty=${pagerDuty}`,
-    );
+  if (pagerDuty === "sent") {
+    console.log(`[paging] run=${run.id} status=${status} pagerDuty=${pagerDuty}`);
   }
   return result;
 }

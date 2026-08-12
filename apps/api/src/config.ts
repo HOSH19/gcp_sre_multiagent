@@ -69,20 +69,15 @@ export const config = {
   /** Fail the run when BigQuery ingest fails in durable mode (default true). */
   bqFailClosed: envBool("BQ_FAIL_CLOSED", true),
   /**
-   * Outbound paging (Slack webhook / PagerDuty Events API v2).
-   * Default on in MODE=gcp when any adapter secret is set; always off in MODE=local unless PAGING=on.
+   * Outbound paging (PagerDuty Events API v2).
+   * Default on in MODE=gcp when routing key is set; always off in MODE=local unless PAGING=on.
    */
   pagingEnabled: (() => {
     const forced = process.env.PAGING;
     if (forced !== undefined && forced.trim() !== "") return envBool("PAGING", false);
     if (mode !== "gcp") return false;
-    return Boolean(
-      (process.env.SLACK_WEBHOOK_URL ?? "").trim() ||
-        (process.env.PAGERDUTY_ROUTING_KEY ?? "").trim(),
-    );
+    return Boolean((process.env.PAGERDUTY_ROUTING_KEY ?? "").trim());
   })(),
-  /** Slack Incoming Webhook URL (Secret Manager → env in Cloud Run). */
-  slackWebhookUrl: (process.env.SLACK_WEBHOOK_URL ?? "").trim(),
   /** PagerDuty Events API v2 routing key (global default; registry may override). */
   pagerDutyRoutingKey: (process.env.PAGERDUTY_ROUTING_KEY ?? "").trim(),
 };

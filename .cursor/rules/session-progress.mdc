@@ -20,6 +20,7 @@ Keep `eval-and-react.mdc` and `code-structure.mdc`. Do **not** grow fuzzy eval a
 - Fixed chip truncation (numbered lists); forced Vertex ReAct function calling (ANY mode) for specialists
 - Vitest suite: `npm test` (unit tests, no live GCP)
 - Proxy: use `nohup` for durable local `gcloud run services proxy web` on `:8080`
+- Removed Slack paging integration; PagerDuty-only outbound notifications
 
 ## Future work (user-requested)
 
