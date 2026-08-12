@@ -28,7 +28,7 @@ export interface ScribeToolArgs {
   cost: IncidentReport["cost"];
 }
 
-/** Fixed tool order until P2 ReAct selects tools. */
+/** Mandatory persistence order; ReAct may call in this sequence, fallback enforces gaps. */
 export const SCRIBE_TOOL_SEQUENCE = ["writeReport", "writeBigQueryTrace", "finalizeRun"] as const;
 
 function requireScribeArgs(ctx: ToolCallContext): ScribeToolArgs {
