@@ -24,6 +24,7 @@ export async function runTool(
   if (!AGENT_TOOLS[agent].includes(tool)) throw new Error(`tool ${tool} not allowed for ${agent}`);
   run.toolCallCount += 1;
   assertCaps(run);
+  const started = Date.now();
   await appendEvent(run.id, {
     agent,
     type: "tool_call",
@@ -33,10 +34,42 @@ export async function runTool(
 
   const handler = toolHandlers[tool as ToolName];
   if (!handler) throw new Error(`unknown tool ${tool}`);
-  const result = await handler({ run, args });
 
+  let result: unknown;
+  try {
+    result = await handler({ run, args });
+  } catch (err) {
+    const durationMs = Date.now() - started;
+    const error = err instanceof Error ? err.message : String(err);
+    await appendEvent(run.id, {
+      agent,
+      type: "tool_result",
+      message: `Error from ${tool}`,
+      data: { tool, durationMs, ok: false, error },
+    });
+    console.info(
+      JSON.stringify({ event: "tool_call", runId: run.id, agent, tool, durationMs, ok: false, error }),
+    );
+    await saveRun(run);
+    await syncRunToFirestore(run);
+    throw err;
+  }
+
+  const durationMs = Date.now() - started;
   if (isEvidence(result)) run.evidence.push(result);
-  await appendEvent(run.id, { agent, type: "tool_result", message: `Result from ${tool}`, data: result });
+  await appendEvent(run.id, {
+    agent,
+    type: "tool_result",
+    message: `Result from ${tool}`,
+    data: {
+      tool,
+      durationMs,
+      ok: true,
+      summary: isEvidence(result) ? result.summary : undefined,
+      result,
+    },
+  });
+  console.info(JSON.stringify({ event: "tool_call", runId: run.id, agent, tool, durationMs, ok: true }));
   await saveRun(run);
   await syncRunToFirestore(run);
   return result;

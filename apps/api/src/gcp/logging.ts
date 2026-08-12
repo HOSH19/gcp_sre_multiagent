@@ -19,13 +19,25 @@ async function accessToken(): Promise<string> {
 }
 
 function entryText(entry: LogEntry): string {
-  if (entry.textPayload) return entry.textPayload;
+  if (entry.textPayload?.trim()) return entry.textPayload.trim();
   if (entry.jsonPayload) {
     const msg = entry.jsonPayload.message ?? entry.jsonPayload.msg ?? entry.jsonPayload.error;
-    if (typeof msg === "string") return msg;
-    return JSON.stringify(entry.jsonPayload);
+    if (typeof msg === "string" && msg.trim()) return msg.trim();
+    const compact = JSON.stringify(entry.jsonPayload);
+    if (compact !== "{}") return compact.slice(0, 200);
   }
-  return "(empty)";
+  const severity = entry.severity ?? "ERROR";
+  const ts = entry.timestamp ?? "unknown time";
+  return `${severity} log entry at ${ts} (no message body)`;
+}
+
+/** Human-readable summary for grouped error log entries (avoids confusing "(empty) (n=40)"). */
+export function formatErrorGroupsSummary(errors: Array<{ message: string; count: number }>): string {
+  if (errors.length === 1 && errors[0]?.count === 0) {
+    return "No error-severity log entries in lookback window";
+  }
+  const parts = errors.map((e) => `${e.message} (${e.count} ${e.count === 1 ? "entry" : "entries"})`);
+  return `Error groups (${errors.length}): ${parts.join("; ")}`;
 }
 
 export async function queryServiceLogs(opts?: {

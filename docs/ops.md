@@ -39,3 +39,17 @@ Local eval: paging no-ops unless `PAGING=on` and secrets are set.
 
 - `MAX_CONCURRENT_RUNS` — global lease slots (`locks/investigations` in Firestore when durable).
 - `MAX_CONCURRENT_PER_SERVICE` — default `1`; blocks a second investigation for the same target (alerts correlate onto the active run).
+
+## Agent / tool observability
+
+Each specialist tool invocation is recorded on the investigation run:
+
+| Sink | What you get |
+|---|---|
+| **Run events** (`GET /runs/:id` → `events[]`) | `tool_call` then `tool_result` with `{ tool, durationMs, ok, summary?, error? }` per call (via `orchestrator/runner.ts`). ReAct turns also emit `thought` events with model + function call names. |
+| **Cloud Run logs** | Structured JSON lines: `{ event: "tool_call", runId, agent, tool, durationMs, ok, error? }` on stdout from the API service. |
+| **Firestore** | Same events persisted when `STORE_BACKEND=firestore` (default in `MODE=gcp`). |
+| **In-memory traces** | `GET /traces` on the API (local/dev) — summary rows appended at Scribe finalize via `syncTraceToBigQuery`. |
+| **BigQuery** | `{BQ_DATASET}.{BQ_TRACES_TABLE}` (default `sre_agents.investigation_traces`) — one row per completed run with cost/tokens/steps; full event JSON in `eventsJson` when Scribe finalizes. |
+
+Uptime checks for the chaos-lab patient are created by `scripts/setup-monitoring.sh` (`patient-health` on `/health`). If the Cloud Run URL changes after deploy, discovery falls back to display name / single `/health` check before returning “not configured”.

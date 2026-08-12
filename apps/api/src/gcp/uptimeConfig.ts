@@ -28,6 +28,16 @@ export function shortCheckId(nameOrId: string): string {
   return parts[parts.length - 1] ?? nameOrId;
 }
 
+export class UptimeCheckNotFoundError extends Error {
+  readonly host?: string;
+
+  constructor(message: string, host?: string) {
+    super(message);
+    this.name = "UptimeCheckNotFoundError";
+    this.host = host;
+  }
+}
+
 function fullCheckName(checkId: string): string {
   if (checkId.includes("/")) return checkId;
   return `${projectParent()}/uptimeCheckConfigs/${checkId}`;
@@ -142,7 +152,20 @@ export async function resolveUptimeCheckConfig(serviceUrl?: string): Promise<Upt
     );
   }
 
-  throw new Error(
-    `no uptime check found for host=${host}; set UPTIME_CHECK_ID or create a monitoring uptime check`,
+  const patientName = config.patientServiceName.toLowerCase();
+  const byDisplayName = configs.find((c) => (c.displayName ?? "").toLowerCase() === "patient-health");
+  if (byDisplayName) return byDisplayName;
+
+  const byPatientLabel = configs.filter((c) =>
+    (c.displayName ?? "").toLowerCase().includes(patientName),
+  );
+  if (byPatientLabel.length === 1) return byPatientLabel[0]!;
+
+  const healthChecks = configs.filter((c) => (c.httpCheck?.path ?? "/") === "/health");
+  if (healthChecks.length === 1) return healthChecks[0]!;
+
+  throw new UptimeCheckNotFoundError(
+    `no uptime check found for host=${host}; run scripts/setup-monitoring.sh or set UPTIME_CHECK_ID`,
+    host,
   );
 }

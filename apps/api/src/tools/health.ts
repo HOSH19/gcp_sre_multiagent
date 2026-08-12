@@ -25,14 +25,31 @@ function applyChaosOverlay(patient: PatientHealth, state: Awaited<ReturnType<typ
   return patient;
 }
 
+function healthSummary(
+  patient: PatientHealth,
+  state: Awaited<ReturnType<typeof chaosState>>,
+): string {
+  if (patient.ok) {
+    return `Patient healthy (revision=${patient.revision ?? "unknown"})`;
+  }
+  let summary = `Patient unhealthy: ${patient.reason ?? "unknown"} (HTTP ${patient.status})`;
+  if (state.activeScenario) {
+    summary += ` — active chaos scenario=${state.activeScenario}`;
+  } else if (config.mode === "gcp") {
+    summary += " — prior chaos may have left bad state; run reset if unexpected";
+  }
+  return summary;
+}
+
 export async function getServiceHealth() {
   const state = await chaosState();
   const patientRaw = await fetchPatient();
   const patient = config.mode === "gcp" ? patientRaw : applyChaosOverlay(patientRaw, state);
-  const summary = patient.ok
-    ? `Patient healthy (revision=${patient.revision ?? "unknown"})`
-    : `Patient unhealthy: ${patient.reason ?? "unknown"} (HTTP ${patient.status})`;
-  return evidence("getServiceHealth", summary, { patient, chaosState: state, mode: config.mode });
+  return evidence("getServiceHealth", healthSummary(patient, state), {
+    patient,
+    chaosState: state,
+    mode: config.mode,
+  });
 }
 
 /** Post-remediation health: in GCP, poll briefly while Cloud Run traffic/env settles. */
@@ -46,8 +63,9 @@ export async function verifyHealth() {
     await new Promise((r) => setTimeout(r, 2000));
     patient = await fetchPatient();
   }
-  const summary = patient.ok
-    ? `Patient healthy (revision=${patient.revision ?? "unknown"})`
-    : `Patient unhealthy: ${patient.reason ?? "unknown"} (HTTP ${patient.status})`;
-  return evidence("verifyHealth", summary, { patient, chaosState: state, mode: config.mode });
+  return evidence("verifyHealth", healthSummary(patient, state), {
+    patient,
+    chaosState: state,
+    mode: config.mode,
+  });
 }
