@@ -160,7 +160,10 @@ export async function runReactLoop(opts: ReactAgentOpts): Promise<{ text: string
         continue;
       }
 
-      const mergedArgs = { ...(toolArgs ?? {}), ...(call.args ?? {}) };
+      const mergedArgs =
+        agent === "scribe" && toolArgs
+          ? { ...(call.args ?? {}), ...toolArgs }
+          : { ...(toolArgs ?? {}), ...(call.args ?? {}) };
       let toolResult: unknown;
       try {
         toolResult = await runTool(run, agent, call.name, mergedArgs);

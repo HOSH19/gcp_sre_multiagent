@@ -36,4 +36,23 @@ describe("MODE=local defaults (integration-style)", () => {
       else process.env.APP_SECRET = prev;
     }
   });
+
+  it("proposeRemediation uses canonicalRootCause for free-form labels", () => {
+    const proposal = proposeRemediation(
+      makeRun({
+        hypotheses: [
+          {
+            id: "hyp_1",
+            rootCauseLabel: "Long narrative about missing APP_SECRET env var on latest revision",
+            canonicalRootCause: "missing_required_env",
+            confidence: 0.95,
+            summary: "missing",
+            evidenceIds: [],
+          },
+        ],
+      }),
+    );
+    expect(proposal.actions[0]?.type).toBe("patch_env");
+    expect(proposal.actions[0]?.details.APP_SECRET).toBeDefined();
+  });
 });

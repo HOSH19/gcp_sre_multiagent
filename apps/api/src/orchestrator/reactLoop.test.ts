@@ -100,4 +100,45 @@ describe("runReactLoop", () => {
       }),
     );
   });
+
+  it("prefers orchestrator toolArgs over model args for scribe tools", async () => {
+    llm.generateWithTools.mockResolvedValueOnce({
+      text: "",
+      tokensIn: 1,
+      tokensOut: 1,
+      costUsd: 0,
+      model: "mock",
+      mocked: true,
+      functionCalls: [
+        {
+          name: "writeReport",
+          args: { healthAfter: { ok: false, detail: "stale from model" } },
+        },
+      ],
+    });
+    const run = makeRun({ id: "run_scribe" });
+    store.runs.set(run.id, run);
+
+    await runReactLoop({
+      run,
+      agent: "scribe",
+      system: "test",
+      userPrompt: "finalize",
+      tools: ["writeReport"],
+      terminalTools: ["writeReport"],
+      toolArgs: { healthAfter: { ok: true, detail: "Patient healthy" }, decision: "approved", cost: { totalUsd: 0 } },
+      maxTurns: 2,
+      mockFinalText: "done",
+    });
+
+    expect(runner.runTool).toHaveBeenCalledWith(
+      run,
+      "scribe",
+      "writeReport",
+      expect.objectContaining({
+        healthAfter: { ok: true, detail: "Patient healthy" },
+        decision: "approved",
+      }),
+    );
+  });
 });

@@ -82,6 +82,30 @@ describe("normalizeExecutableActions", () => {
     expect(skipped.map((a) => a.type)).toEqual(["page_oncall"]);
   });
 
+  it("canonicalizes empty patch_env details when canonicalRootCause is missing_required_env", () => {
+    const run = makeRun({
+      hypotheses: [
+        {
+          id: "hyp_1",
+          rootCauseLabel:
+            "The service is unhealthy because the latest revision is missing a required environment variable 'APP_SECRET'.",
+          canonicalRootCause: "missing_required_env",
+          confidence: 0.95,
+          summary: "missing",
+          evidenceIds: [],
+        },
+      ],
+      proposedRemediation: {
+        summary: "restore",
+        risk: "low",
+        actions: [{ type: "patch_env", reason: "llm forgot details", details: {} }],
+      },
+    });
+    const { executable } = normalizeExecutableActions(run);
+    expect(executable).toHaveLength(1);
+    expect(executable[0]?.details.APP_SECRET).toBe("local-secret");
+  });
+
   it("canonicalizes malformed patch_env details from deterministic fallback", () => {
     const run = makeRun({
       hypotheses: [

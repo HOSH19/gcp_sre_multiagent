@@ -1,5 +1,6 @@
 import type { InvestigationRun, RemediationAction } from "@gcp-sre/shared";
 import { proposeRemediation as deterministicProposal } from "../tools/remediate.js";
+import { isMissingRequiredEnv } from "./rootCause.js";
 import { executableActionsFromProposal, isExecutableActionType } from "./policy.js";
 
 function canonicalizePatchEnv(
@@ -14,8 +15,7 @@ function canonicalizePatchEnv(
     !Object.keys(action.details).length ||
     Boolean(malformedAlias) ||
     "action_type" in action.details ||
-    (run.hypotheses[0]?.rootCauseLabel === "missing_required_env" &&
-      !("APP_SECRET" in action.details));
+    (isMissingRequiredEnv(run) && !("APP_SECRET" in action.details));
 
   if (!needsCanonicalPatch) return action;
   return { ...action, details: { ...fallbackDetails } };
