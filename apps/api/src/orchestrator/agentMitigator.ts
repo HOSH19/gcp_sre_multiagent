@@ -26,29 +26,40 @@ async function runMitigatorProposeDeterministic(run: InvestigationRun): Promise<
 }
 
 async function runMitigatorProposeReact(run: InvestigationRun): Promise<void> {
-  await runReactAgent({
-    run,
-    agent: "mitigator",
-    system: [
-      "You are Mitigator. Propose remediation for human approval — do NOT execute mutations.",
-      "CRITICAL: Invoke tools via function calling (functionCall), never by naming them in prose.",
-      "You MUST call proposeRemediation with summary, risk, and actions — do not only describe the plan in text.",
-      "Prefer allowlisted action types: rollback_traffic, patch_env.",
-      "For patch_env, details must be a literal env-var map such as {\"APP_SECRET\":\"restore-known-good\"}; do not emit meta keys like environment_variable or action_type.",
-      "Unknown action types may be proposed for visibility but will never execute.",
-      "You may call read tools if you need more context. After proposeRemediation you are done.",
-    ].join(" "),
-    userPrompt: [
-      `Service=${run.targetService ?? run.patientService}`,
-      `Top hypotheses:\n${JSON.stringify(run.hypotheses.slice(0, 3), null, 2)}`,
-      `Evidence count=${run.evidence.length}`,
-      "Call proposeRemediation via function calling now.",
-    ].join("\n"),
-    terminalTools: ["proposeRemediation"],
-    maxTurns: 6,
-    maxToollessTurns: 3,
-    mockFinalText: "Proposing allowlisted remediation.",
-  });
+  try {
+    await runReactAgent({
+      run,
+      agent: "mitigator",
+      system: [
+        "You are Mitigator. Propose remediation for human approval — do NOT execute mutations.",
+        "CRITICAL: Invoke tools via function calling (functionCall), never by naming them in prose.",
+        "You MUST call proposeRemediation with summary, risk, and actions — do not only describe the plan in text.",
+        "Prefer allowlisted action types: rollback_traffic, patch_env.",
+        "For patch_env, details must be a literal env-var map such as {\"APP_SECRET\":\"restore-known-good\"}; do not emit meta keys like environment_variable or action_type.",
+        "Unknown action types may be proposed for visibility but will never execute.",
+        "You may call read tools if you need more context. After proposeRemediation you are done.",
+      ].join(" "),
+      userPrompt: [
+        `Service=${run.targetService ?? run.patientService}`,
+        `Top hypotheses:\n${JSON.stringify(run.hypotheses.slice(0, 3), null, 2)}`,
+        `Evidence count=${run.evidence.length}`,
+        "Call proposeRemediation via function calling now.",
+      ].join("\n"),
+      terminalTools: ["proposeRemediation"],
+      maxTurns: 6,
+      maxToollessTurns: 3,
+      mockFinalText: "Proposing allowlisted remediation.",
+    });
+  } catch (err) {
+    ensureRemediationProposal(run);
+    await appendEvent(run.id, {
+      agent: "mitigator",
+      type: "status",
+      message: `ReAct failed (${err instanceof Error ? err.message : String(err)}) — using deterministic fallback`,
+      data: run.proposedRemediation,
+    });
+    return;
+  }
 
   if (!run.proposedRemediation) {
     ensureRemediationProposal(run);

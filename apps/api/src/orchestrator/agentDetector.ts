@@ -42,6 +42,7 @@ async function runDetectorReact(run: InvestigationRun): Promise<void> {
         "Do not write a plan as text — emit function calls immediately. Do not ask questions.",
       ].join(" "),
       userPrompt: `Investigate service=${run.targetService ?? run.patientService} project=${run.projectId ?? "unknown"} region=${run.region ?? "unknown"}. Use function calls now.`,
+      tools: [...DETECTOR_TOOLS],
       terminalTools: [],
       maxTurns: 8,
       maxToollessTurns: 3,

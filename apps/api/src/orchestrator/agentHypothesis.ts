@@ -24,6 +24,21 @@ async function runHypothesisDeterministic(run: InvestigationRun): Promise<void> 
   });
 }
 
+async function applyHypothesisFallback(
+  run: InvestigationRun,
+  reason: string,
+): Promise<void> {
+  const inferred = inferHypotheses(run);
+  run.hypotheses = inferred.hypotheses;
+  run.ruledOut = inferred.ruledOut;
+  await appendEvent(run.id, {
+    agent: "hypothesis",
+    type: "status",
+    message: reason,
+    data: inferred,
+  });
+}
+
 async function runHypothesisReact(run: InvestigationRun): Promise<void> {
   const evidenceBrief = run.evidence.map((e) => ({
     id: e.id,
@@ -31,37 +46,37 @@ async function runHypothesisReact(run: InvestigationRun): Promise<void> {
     summary: e.summary,
   }));
 
-  await runReactAgent({
-    run,
-    agent: "hypothesis",
-    system: [
-      "You are Hypothesis, an SRE root-cause analyst.",
-      "CRITICAL: Invoke tools via function calling (functionCall), never by naming them in prose.",
-      "You may call read tools to gather more evidence if needed.",
-      "You MUST finish by calling submitHypotheses with ranked hypotheses — do not only describe them in text.",
-      "rootCauseLabel is a FREE-FORM human-readable string (not limited to a fixed enum).",
-      "Also set canonicalRootCause when the cause maps to a known scenario: unhealthy_revision_receiving_traffic or missing_required_env.",
-      "If none apply, omit canonicalRootCause or use a short free-form value.",
-      "Prefer labels that match evidence; include confidence 0-1 and evidenceIds when known.",
-      "After submitHypotheses you are done — do not call more tools.",
-    ].join(" "),
-    userPrompt: `Service=${run.targetService ?? run.patientService}\nEvidence:\n${JSON.stringify(evidenceBrief, null, 2)}\n\nCall submitHypotheses via function calling when ready.`,
-    terminalTools: ["submitHypotheses"],
-    maxTurns: 8,
-    maxToollessTurns: 3,
-    mockFinalText: "Submitting hypotheses from evidence.",
-  });
+  try {
+    await runReactAgent({
+      run,
+      agent: "hypothesis",
+      system: [
+        "You are Hypothesis, an SRE root-cause analyst.",
+        "CRITICAL: Invoke tools via function calling (functionCall), never by naming them in prose.",
+        "You may call read tools to gather more evidence if needed.",
+        "You MUST finish by calling submitHypotheses with ranked hypotheses — do not only describe them in text.",
+        "rootCauseLabel is a FREE-FORM human-readable string (not limited to a fixed enum).",
+        "Also set canonicalRootCause when the cause maps to a known scenario: unhealthy_revision_receiving_traffic or missing_required_env.",
+        "If none apply, omit canonicalRootCause or use a short free-form value.",
+        "Prefer labels that match evidence; include confidence 0-1 and evidenceIds when known.",
+        "After submitHypotheses you are done — do not call more tools.",
+      ].join(" "),
+      userPrompt: `Service=${run.targetService ?? run.patientService}\nEvidence:\n${JSON.stringify(evidenceBrief, null, 2)}\n\nCall submitHypotheses via function calling when ready.`,
+      terminalTools: ["submitHypotheses"],
+      maxTurns: 8,
+      maxToollessTurns: 3,
+      mockFinalText: "Submitting hypotheses from evidence.",
+    });
+  } catch (err) {
+    await applyHypothesisFallback(
+      run,
+      `ReAct failed (${err instanceof Error ? err.message : String(err)}) — using deterministic fallback`,
+    );
+    return;
+  }
 
   if (!run.hypotheses.length) {
-    const inferred = inferHypotheses(run);
-    run.hypotheses = inferred.hypotheses;
-    run.ruledOut = inferred.ruledOut;
-    await appendEvent(run.id, {
-      agent: "hypothesis",
-      type: "status",
-      message: "ReAct did not submit hypotheses — using deterministic fallback",
-      data: inferred,
-    });
+    await applyHypothesisFallback(run, "ReAct did not submit hypotheses — using deterministic fallback");
   } else {
     await appendEvent(run.id, {
       agent: "hypothesis",

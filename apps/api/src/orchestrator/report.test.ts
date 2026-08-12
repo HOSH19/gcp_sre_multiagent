@@ -84,6 +84,21 @@ describe("finalizeWithScribe", () => {
     expect(runTool.mock.calls.map((call) => call[2])).toEqual(["writeBigQueryTrace", "finalizeRun"]);
   });
 
+  it("falls back to deterministic tools when ReAct throws", async () => {
+    runReactAgent.mockRejectedValueOnce(new Error("vertex timeout"));
+    const { finalizeWithScribe } = await import("./report.js");
+    const run = baseRun();
+
+    await finalizeWithScribe(run, "denied");
+
+    expect(runReactAgent).toHaveBeenCalledOnce();
+    expect(runTool.mock.calls.map((call) => call[2])).toEqual([
+      "writeReport",
+      "writeBigQueryTrace",
+      "finalizeRun",
+    ]);
+  });
+
   it("runs deterministic scribe tool sequence when react is disabled", async () => {
     reactEnabled.mockReturnValue(false);
     const { finalizeWithScribe } = await import("./report.js");

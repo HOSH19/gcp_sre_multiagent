@@ -43,37 +43,48 @@ async function runScribeReact(
   executedActions?: RemediationAction[],
   healthAfter?: { ok: boolean; detail: string },
 ): Promise<void> {
-  const { toolsCalled } = await runReactAgent({
-    run,
-    agent: "scribe",
-    system: [
-      "You are Scribe, the incident report writer for a Cloud Run investigation.",
-      "CRITICAL: Invoke tools via function calling (functionCall), never by naming them in prose or pseudo-code.",
-      "Do not write Python, JSON tool plans, or invented run/decision/cost/hypothesis fields.",
-      "Decision, cost, executed actions, and post-remediation health are merged by the orchestrator — call tools with empty args.",
-      "Call writeReport, then writeBigQueryTrace, then finalizeRun in that order.",
-      "After finalizeRun succeeds you are done — do not call more tools.",
-    ].join(" "),
-    userPrompt: [
-      `Run ${run.id} is ready to finalize.`,
-      `Decision: ${decision}`,
-      `Top hypotheses:\n${JSON.stringify(run.hypotheses.slice(0, 3), null, 2)}`,
-      `Evidence count: ${run.evidence.length}`,
-      decision === "approved" && executedActions?.length
-        ? `Executed remediation:\n${JSON.stringify(executedActions, null, 2)}`
-        : "",
-      healthAfter ? `Post-remediation health: ${JSON.stringify(healthAfter)}` : "",
-      "Call writeReport via function calling, then writeBigQueryTrace, then finalizeRun.",
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    tools: [...SCRIBE_TOOL_SEQUENCE],
-    terminalTools: ["finalizeRun"],
-    toolArgs: args as unknown as Record<string, unknown>,
-    maxTurns: 6,
-    maxToollessTurns: 3,
-    mockFinalText: "Finalizing incident report via function calling.",
-  });
+  let toolsCalled: string[] = [];
+  try {
+    ({ toolsCalled } = await runReactAgent({
+      run,
+      agent: "scribe",
+      system: [
+        "You are Scribe, the incident report writer for a Cloud Run investigation.",
+        "CRITICAL: Invoke tools via function calling (functionCall), never by naming them in prose or pseudo-code.",
+        "Do not write Python, JSON tool plans, or invented run/decision/cost/hypothesis fields.",
+        "Decision, cost, executed actions, and post-remediation health are merged by the orchestrator — call tools with empty args.",
+        "Call writeReport, then writeBigQueryTrace, then finalizeRun in that order.",
+        "After finalizeRun succeeds you are done — do not call more tools.",
+      ].join(" "),
+      userPrompt: [
+        `Run ${run.id} is ready to finalize.`,
+        `Decision: ${decision}`,
+        `Top hypotheses:\n${JSON.stringify(run.hypotheses.slice(0, 3), null, 2)}`,
+        `Evidence count: ${run.evidence.length}`,
+        decision === "approved" && executedActions?.length
+          ? `Executed remediation:\n${JSON.stringify(executedActions, null, 2)}`
+          : "",
+        healthAfter ? `Post-remediation health: ${JSON.stringify(healthAfter)}` : "",
+        "Call writeReport via function calling, then writeBigQueryTrace, then finalizeRun.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      tools: [...SCRIBE_TOOL_SEQUENCE],
+      terminalTools: ["finalizeRun"],
+      toolArgs: args as unknown as Record<string, unknown>,
+      maxTurns: 6,
+      maxToollessTurns: 3,
+      mockFinalText: "Finalizing incident report via function calling.",
+    }));
+  } catch (err) {
+    await appendEvent(run.id, {
+      agent: "scribe",
+      type: "status",
+      message: `ReAct failed (${err instanceof Error ? err.message : String(err)}) — using deterministic fallback`,
+    });
+    await runScribeDeterministic(run, args);
+    return;
+  }
 
   if (!toolsCalled.includes("finalizeRun")) {
     await runScribeFallback(run, args, toolsCalled);
