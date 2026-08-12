@@ -68,6 +68,22 @@ export async function firestoreGetRun(runId: string): Promise<InvestigationRun |
   return docToRun(snap.id, snap.data()!, events);
 }
 
+export async function firestoreTryTransitionRunStatus(
+  runId: string,
+  from: InvestigationRun["status"],
+  to: InvestigationRun["status"],
+): Promise<boolean> {
+  const ref = runDocPath(runId);
+  return getFirestore().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return false;
+    const data = snap.data()!;
+    if (data.status !== from) return false;
+    tx.set(ref, { status: to, updatedAt: nowIso() }, { merge: true });
+    return true;
+  });
+}
+
 export async function firestoreListRuns(): Promise<InvestigationRun[]> {
   const snap = await getFirestore().collection(RUNS).orderBy("createdAt", "desc").limit(100).get();
   const runs: InvestigationRun[] = [];

@@ -20,6 +20,14 @@ function blockingRunId(message: string): string | null {
   return m?.[1] ?? null;
 }
 
+function NoticeBanner({ message }: { message: string }) {
+  return (
+    <p style={{ color: "var(--good)", marginBottom: "1rem" }} className="mono">
+      {message}
+    </p>
+  );
+}
+
 function ErrorBanner({ message }: { message: string }) {
   const capacity = CAPACITY_HINTS.some((h) => message.includes(h));
   const blocker = blockingRunId(message);
@@ -52,12 +60,15 @@ export default function HomePage() {
         <InvestigatePanel
           scenario={c.scenario}
           busy={c.locked}
+          resetBusy={c.resetBusy}
           onScenario={c.setScenario}
           onInvestigate={c.investigate}
+          onResetLab={c.resetLab}
         />
         <HypothesesCard run={c.run} />
         <ReportCard run={c.run} />
       </section>
+      {c.notice && <NoticeBanner message={c.notice} />}
       {c.error && <ErrorBanner message={c.error} />}
       {c.run && (
         <StatusBanner

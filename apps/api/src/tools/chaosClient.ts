@@ -1,6 +1,8 @@
 import type { ScenarioId } from "@gcp-sre/shared";
 import { config } from "../config.js";
 
+const CHAOS_FETCH_TIMEOUT_MS = 130_000;
+
 async function identityToken(audience: string): Promise<string | null> {
   if (process.env.GCP_IDENTITY_TOKEN) return process.env.GCP_IDENTITY_TOKEN;
   if (config.mode !== "gcp") return null;
@@ -26,9 +28,19 @@ export async function chaosFetch(path: string, init?: RequestInit) {
   };
   if (token) headers.authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${base}${path}`, { ...init, headers });
+  const res = await fetch(`${base}${path}`, {
+    ...init,
+    headers,
+    signal: AbortSignal.timeout(CHAOS_FETCH_TIMEOUT_MS),
+  });
   const body = await res.json().catch(() => ({}));
   return { status: res.status, body };
+}
+
+export async function resetChaosController(): Promise<boolean> {
+  const res = await chaosFetch("/reset", { method: "POST" });
+  const body = res.body as { ok?: boolean };
+  return res.status >= 200 && res.status < 300 && body.ok !== false;
 }
 
 export async function injectChaosScenario(scenario: ScenarioId): Promise<void> {

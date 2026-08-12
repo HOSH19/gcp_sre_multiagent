@@ -37,3 +37,14 @@ export async function decide(runId: string, decision: "approve" | "deny"): Promi
   const body = await request<{ run: Run }>(`/runs/${runId}/${decision}`, { method: "POST" });
   return body.run;
 }
+
+export interface ResetLabResponse {
+  ok: true;
+  chaosReset: boolean;
+  runsCleared: string[];
+  leasesReleased: boolean;
+}
+
+export async function resetLab(): Promise<ResetLabResponse> {
+  return request<ResetLabResponse>("/reset-lab", { method: "POST" });
+}

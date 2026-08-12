@@ -4,6 +4,7 @@ import {
   firestoreCountActiveLeases,
   firestoreGetActiveLeaseRunId,
   firestoreListActiveLeases,
+  firestoreReleaseAllLeases,
   firestoreReleaseLease,
   firestoreTryAcquireLease,
 } from "./firestore.js";
@@ -87,4 +88,22 @@ export async function releaseLock(runId: string): Promise<void> {
   }
   removeActiveRunId(runId);
   if (activeRunIds.size === 0) setActiveRunId(null);
+}
+
+/** Clear every investigation lease holder (operator recovery). */
+export async function releaseAllInvestigationLeases(): Promise<void> {
+  const ids = [...activeRunIds];
+  if (config.useDurableStore) {
+    await firestoreReleaseAllLeases(INVESTIGATION_LOCK_SCOPE);
+    for (const runId of ids) {
+      const run = await getRun(runId);
+      if (run) {
+        run.leaseOwner = undefined;
+        run.leaseExpiresAt = undefined;
+        await saveRun(run);
+      }
+    }
+  }
+  activeRunIds.clear();
+  setActiveRunId(null);
 }

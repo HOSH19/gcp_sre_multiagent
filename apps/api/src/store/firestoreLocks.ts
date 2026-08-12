@@ -99,4 +99,9 @@ export async function firestoreCountActiveLeases(scope: string): Promise<number>
   return pruneHolders(lock?.holders ?? []).length;
 }
 
+export async function firestoreReleaseAllLeases(scope: string): Promise<void> {
+  const ref = lockDocPath(scope);
+  await ref.set({ scope, holders: [], updatedAt: nowIso() }, { merge: true });
+}
+
 export { pruneHolders, readLock };

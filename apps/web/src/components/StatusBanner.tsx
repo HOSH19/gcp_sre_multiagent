@@ -36,6 +36,11 @@ export function StatusBanner({
         {meta.title} · {run.status}
       </div>
       <div style={{ color: "var(--muted)", fontSize: 14 }}>{meta.detail}</div>
+      {run.error && (
+        <div style={{ color: "var(--bad)", fontSize: 14, marginTop: 8 }} className="mono">
+          {run.error}
+        </div>
+      )}
       {canDecide && onApprove && onDeny && (
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <button className="good" disabled={busy} onClick={onApprove}>

@@ -8,6 +8,7 @@ export {
 export {
   firestoreTryAcquireLease,
   firestoreReleaseLease,
+  firestoreReleaseAllLeases,
   firestoreGetActiveLeaseRunId,
   firestoreListActiveLeases,
   firestoreCountActiveLeases,
