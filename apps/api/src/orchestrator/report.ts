@@ -1,10 +1,7 @@
-import { nowIso, type InvestigationRun, type RemediationAction } from "@gcp-sre/shared";
-import {
-  SCRIBE_TOOL_SEQUENCE,
-  type ScribeToolArgs,
-} from "../tools/index.js";
+import { type InvestigationRun, type RemediationAction } from "@gcp-sre/shared";
+import { SCRIBE_TOOL_SEQUENCE, type ScribeToolArgs } from "../tools/index.js";
 import { modelBreakdown } from "./cost.js";
-import { llmStep, runTool } from "./runner.js";
+import { runTool } from "./runner.js";
 
 /**
  * Build orchestrator-owned Scribe args (decision, cost, health).
@@ -47,20 +44,6 @@ export async function finalizeWithScribe(
   executedActions?: RemediationAction[],
   healthAfter?: { ok: boolean; detail: string },
 ): Promise<void> {
-  await llmStep(
-    run,
-    "scribe",
-    "You are Scribe. Finalize the incident by calling writeReport, writeBigQueryTrace, then finalizeRun. Use only the orchestrator-supplied decision, cost, and hypotheses — do not invent them.",
-    [
-      `run=${run.id}`,
-      `decision=${decision}`,
-      `hypotheses=${JSON.stringify(run.hypotheses)}`,
-      `costUsd=${run.costUsd}`,
-      `at=${nowIso()}`,
-    ].join(" "),
-    `{"tools":${JSON.stringify([...SCRIBE_TOOL_SEQUENCE])}}`,
-  );
-
   const scribeArgs = buildScribeArgs(run, decision, executedActions, decision === "approved" ? healthAfter : undefined);
   await runScribeTools(run, scribeArgs);
 }

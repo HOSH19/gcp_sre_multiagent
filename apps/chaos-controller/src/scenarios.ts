@@ -153,7 +153,7 @@ export async function patchEnv(vars: Record<string, string>) {
     syncLocalFromTraffic(trafficMap(result.service));
   }
 
-  if (localState.activeScenario === "missing_config" && localState.env.APP_SECRET) {
+  if (localState.activeScenario === "missing_config" && ("APP_SECRET" in vars || localState.env.APP_SECRET)) {
     localState.activeScenario = null;
   }
   return localState.env;

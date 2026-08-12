@@ -1,16 +1,10 @@
 import type { InvestigationRun } from "@gcp-sre/shared";
 import { queueNotifyRunStatus } from "../paging/index.js";
 import { appendEvent, getRun, releaseLock, saveRun, tryTransitionRunStatus } from "../store/index.js";
-import { patchEnvVars, rollbackTraffic, verifyHealth } from "../tools/index.js";
+import { healthEvidenceOk, patchEnvVars, rollbackTraffic, verifyHealth } from "../tools/index.js";
 import { normalizeExecutableActions } from "./approvalNormalize.js";
 import { assertCaps } from "./caps.js";
 import { finalizeWithScribe } from "./report.js";
-
-function approvedHealthSummary(health: unknown): { ok: boolean; detail: string } {
-  const patientOk = Boolean((health as { raw?: { patient?: { ok?: boolean } }; summary?: string })?.raw?.patient?.ok);
-  const detail = (health as { summary?: string })?.summary ?? "Post-remediation health unknown";
-  return { ok: patientOk, detail };
-}
 
 async function failRemediation(run: InvestigationRun, err: unknown): Promise<InvestigationRun> {
   const message = err instanceof Error ? err.message : String(err);
@@ -90,7 +84,7 @@ async function executeApprovedRemediation(run: InvestigationRun): Promise<Invest
     const executed = await executeActions(run);
     const health = await runRemediationTool(run, "verifyHealth", verifyHealth);
     run.evidence.push(health as InvestigationRun["evidence"][number]);
-    await finalizeWithScribe(run, "approved", executed, approvedHealthSummary(health));
+    await finalizeWithScribe(run, "approved", executed, healthEvidenceOk(health));
     await releaseLock(run.id);
     return run;
   } catch (err) {

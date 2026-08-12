@@ -39,6 +39,7 @@ vi.mock("../tools/index.js", () => ({
   rollbackTraffic: vi.fn(async () => ({ ok: true })),
   patchEnvVars: vi.fn(async () => ({ ok: true })),
   verifyHealth: vi.fn(async () => ({ id: "ev_health", source: "health", summary: "ok", raw: { patient: { ok: true } } })),
+  healthEvidenceOk: vi.fn(() => ({ ok: true, detail: "ok" })),
 }));
 
 import { queueApproval } from "./approval.js";

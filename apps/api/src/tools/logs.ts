@@ -1,5 +1,5 @@
 import { config } from "../config.js";
-import { fetchCloudRunRevisions, fetchCloudRunService } from "../gcp/cloudRun.js";
+import { fetchCloudRunRevisions, fetchCloudRunService, limitRevisionsForEvidence } from "../gcp/cloudRun.js";
 import { queryServiceLogs } from "../gcp/logging.js";
 import { chaosState } from "./chaosClient.js";
 import { evidence } from "./evidence.js";
@@ -52,11 +52,16 @@ export async function listRevisions(ctx?: ToolCallContext) {
   const ref = serviceRefFromRun(ctx?.run);
   if (config.mode === "gcp") {
     try {
-      const revisions = await fetchCloudRunRevisions(ref);
+      const allRevisions = await fetchCloudRunRevisions(ref);
+      const { traffic } = await fetchCloudRunService(ref);
+      const revisions = limitRevisionsForEvidence(allRevisions, traffic);
+      const omitted = allRevisions.length - revisions.length;
+      const revisionLine = revisions.map((r) => `${r.name}(${r.healthy ? "healthy" : "unhealthy"})`).join(", ");
+      const omitNote = omitted > 0 ? `; ${omitted} older revision(s) omitted` : "";
       return evidence(
         "listRevisions",
-        `Revisions: ${revisions.map((r) => `${r.name}(${r.healthy ? "healthy" : "unhealthy"})`).join(", ")}`,
-        { revisions, service: ref.name, source: "cloud_run" },
+        `Revisions (${revisions.length}${omitted ? ` of ${allRevisions.length}` : ""}): ${revisionLine}${omitNote}`,
+        { revisions, totalRevisions: allRevisions.length, service: ref.name, source: "cloud_run" },
       );
     } catch (err) {
       const state = await chaosState();
