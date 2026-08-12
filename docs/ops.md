@@ -53,3 +53,42 @@ Each specialist tool invocation is recorded on the investigation run:
 | **BigQuery** | `{BQ_DATASET}.{BQ_TRACES_TABLE}` (default `sre_agents.investigation_traces`) — one row per completed run with cost/tokens/steps; full event JSON in `eventsJson` when Scribe finalizes. |
 
 Uptime checks for the chaos-lab patient are created by `scripts/setup-monitoring.sh` (`patient-health` on `/health`). If the Cloud Run URL changes after deploy, discovery falls back to display name / single `/health` check before returning “not configured”.
+
+### Stuck investigation slot
+
+Symptoms: UI/API error `target patient already has an active investigation (max per service = 1)`.
+
+1. **Inspect API state** (requires `roles/run.invoker`):
+
+```bash
+API_URL="$(gcloud run services describe api --project=sre-multiagent --region=us-central1 --format='value(status.url)')"
+TOKEN="$(gcloud auth print-identity-token)"
+curl -sS -H "Authorization: Bearer $TOKEN" "$API_URL/health" | jq '{activeRunIds,activeLeaseCount,blockingRun}'
+curl -sS -H "Authorization: Bearer $TOKEN" "$API_URL/runs" | jq '[.runs[] | select(.status|IN("queued","running","awaiting_approval","remediating")) | {id,status,targetService,leaseExpiresAt,updatedAt}]'
+```
+
+2. **Cancel a specific run** (releases Firestore lease when deployed):
+
+```bash
+curl -sS -X POST -H "Authorization: Bearer $TOKEN" "$API_URL/runs/RUN_ID/cancel" | jq .
+```
+
+3. **Emergency Firestore cleanup** (orphaned BUSY rows with no live lease — e.g. after Cloud Run instance loss):
+
+```bash
+node --input-type=module <<'SCRIPT'
+import { Firestore, FieldValue } from "@google-cloud/firestore";
+const db = new Firestore({ projectId: "sre-multiagent" });
+const BUSY = new Set(["queued","running","awaiting_approval","remediating"]);
+const now = new Date().toISOString();
+for (const doc of (await db.collection("runs").orderBy("createdAt","desc").limit(100).get()).docs) {
+  const d = doc.data();
+  if ((d.targetService ?? d.patientService) !== "patient" || !BUSY.has(d.status)) continue;
+  await doc.ref.set({ status: "failed", error: "operator: cleared stale run", updatedAt: now, leaseOwner: FieldValue.delete(), leaseExpiresAt: FieldValue.delete() }, { merge: true });
+  console.log("failed", doc.id);
+}
+await db.collection("locks").doc("investigations").set({ scope: "investigations", holders: [], updatedAt: now }, { merge: true });
+SCRIPT
+```
+
+After deploy, `/health` includes `blockingRun` and capacity errors name the blocking run id. Orphaned BUSY rows no longer block once their lease TTL and `updatedAt` age out (`fleet/correlate.ts`).

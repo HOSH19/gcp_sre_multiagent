@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { SCENARIOS } from "@gcp-sre/shared";
 import { config } from "../config.js";
+import { findActiveRunForTarget } from "../fleet/correlate.js";
 import { loadServiceRegistry } from "../fleet/index.js";
 import { countActiveLeases, getActiveRunId, listActiveRunIds } from "../store/index.js";
 
@@ -9,11 +10,24 @@ export function registerMetaRoutes(app: Hono): void {
     let activeRunId: string | null = null;
     let activeRunIds: string[] = [];
     let activeLeaseCount = 0;
+    let blockingRun: { id: string; status: string; targetService: string } | null = null;
     let storeError: string | undefined;
     try {
       activeRunId = await getActiveRunId();
       activeRunIds = await listActiveRunIds();
       activeLeaseCount = await countActiveLeases();
+      const blocker = await findActiveRunForTarget({
+        targetService: config.patientServiceName,
+        projectId: config.projectId,
+        region: config.region,
+      });
+      if (blocker) {
+        blockingRun = {
+          id: blocker.id,
+          status: blocker.status,
+          targetService: blocker.targetService ?? blocker.patientService,
+        };
+      }
     } catch (err) {
       storeError = err instanceof Error ? err.message : String(err);
       console.error("[health] store probe failed:", storeError);
@@ -30,6 +44,7 @@ export function registerMetaRoutes(app: Hono): void {
       activeRunId,
       activeRunIds,
       activeLeaseCount,
+      blockingRun,
       ...(storeError ? { storeError } : {}),
     });
   });

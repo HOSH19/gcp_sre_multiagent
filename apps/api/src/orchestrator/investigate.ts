@@ -8,21 +8,28 @@ import { runDetector, runHypothesis, runLogDiver, runMitigatorPropose } from "./
 
 const BUSY = new Set(["queued", "running", "awaiting_approval", "remediating"]);
 
+function perServiceCapacityError(target: string, blocker: InvestigationRun): string {
+  return (
+    `target ${target} already has an active investigation (max per service = ${config.maxConcurrentPerService}); ` +
+    `blocking run ${blocker.id} (${blocker.status})`
+  );
+}
+
 /**
  * Enforce MAX_CONCURRENT_PER_SERVICE (default 1) before taking a global lease.
  * Alert correlation attaches repeats; this blocks a second investigation for the same target.
  */
-async function hasPerServiceCapacity(run: InvestigationRun): Promise<boolean> {
+async function findPerServiceBlocker(run: InvestigationRun): Promise<InvestigationRun | undefined> {
   const target = run.targetService || run.patientService;
-  if (!target) return true;
+  if (!target) return undefined;
 
   const active = await findActiveRunForTarget({
     targetService: target,
     projectId: run.projectId ?? config.projectId,
     region: run.region ?? config.region,
   });
-  if (!active || active.id === run.id) return true;
-  if (config.maxConcurrentPerService <= 1) return false;
+  if (!active || active.id === run.id) return undefined;
+  if (config.maxConcurrentPerService <= 1) return active;
 
   const ids = await listActiveRunIds();
   let count = 0;
@@ -36,15 +43,14 @@ async function hasPerServiceCapacity(run: InvestigationRun): Promise<boolean> {
     if (run.region && peer.region && peer.region !== run.region) continue;
     count += 1;
   }
-  return count < config.maxConcurrentPerService;
+  return count >= config.maxConcurrentPerService ? active : undefined;
 }
 
 /** Fail fast before chaos inject so we never mutate the lab when a slot is unavailable. */
 export async function assertInvestigationCapacity(run: InvestigationRun): Promise<void> {
-  if (!(await hasPerServiceCapacity(run))) {
-    throw new Error(
-      `target ${run.targetService ?? run.patientService} already has an active investigation (max per service = ${config.maxConcurrentPerService})`,
-    );
+  const blocker = await findPerServiceBlocker(run);
+  if (blocker) {
+    throw new Error(perServiceCapacityError(run.targetService ?? run.patientService ?? "unknown", blocker));
   }
 }
 
@@ -52,9 +58,10 @@ export async function startInvestigation(runId: string): Promise<InvestigationRu
   const run = await getRun(runId);
   if (!run) throw new Error("run not found");
 
-  if (!(await hasPerServiceCapacity(run))) {
+  const blocker = await findPerServiceBlocker(run);
+  if (blocker) {
     run.status = "failed";
-    run.error = `target ${run.targetService ?? run.patientService} already has an active investigation (max per service = ${config.maxConcurrentPerService})`;
+    run.error = perServiceCapacityError(run.targetService ?? run.patientService ?? "unknown", blocker);
     await saveRun(run);
     throw new Error(run.error);
   }

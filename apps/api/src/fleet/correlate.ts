@@ -8,6 +8,9 @@ import { getRun, listActiveRunIds, listRuns } from "../store/index.js";
 
 const BUSY = new Set(["queued", "running", "awaiting_approval", "remediating"]);
 
+/** Queued runs with no lease yet (background start on Cloud Run). */
+const QUEUED_WITHOUT_LEASE_MS = 2 * 60 * 1000;
+
 function matchesTarget(
   run: InvestigationRun,
   opts: { targetService: string; projectId?: string; region?: string },
@@ -20,6 +23,38 @@ function matchesTarget(
 }
 
 /**
+ * True when a run should count against per-service concurrency (lease, fresh queued, or recent worker heartbeat).
+ * Ignores orphaned Firestore rows left in BUSY after lease expiry or instance loss.
+ */
+export function isActiveInvestigationRun(
+  run: InvestigationRun,
+  leasedRunIds: ReadonlySet<string>,
+  now = Date.now(),
+): boolean {
+  if (!BUSY.has(run.status)) return false;
+  if (leasedRunIds.has(run.id)) return true;
+  if (run.status === "queued") {
+    return now - Date.parse(run.createdAt) < QUEUED_WITHOUT_LEASE_MS;
+  }
+  const leaseEnd = run.leaseExpiresAt ? Date.parse(run.leaseExpiresAt) : 0;
+  if (leaseEnd > now) return true;
+  return now - Date.parse(run.updatedAt) < config.leaseTtlMs;
+}
+
+async function leasedRunIdSet(): Promise<Set<string>> {
+  if (config.useDurableStore) {
+    try {
+      const holders = await firestoreListActiveLeases(INVESTIGATION_LOCK_SCOPE);
+      return new Set(holders.map((h) => h.runId));
+    } catch (err) {
+      console.warn("[correlate] lease lookup failed; falling back to run scan:", err);
+      return new Set();
+    }
+  }
+  return new Set(await listActiveRunIds());
+}
+
+/**
  * Find an in-flight investigation for the same target service.
  * Prefers lease holders (durable + memory multi-concurrent) so correlation is accurate.
  */
@@ -28,24 +63,17 @@ export async function findActiveRunForTarget(opts: {
   projectId?: string;
   region?: string;
 }): Promise<InvestigationRun | undefined> {
-  if (config.useDurableStore) {
-    try {
-      const holders = await firestoreListActiveLeases(INVESTIGATION_LOCK_SCOPE);
-      for (const h of holders) {
-        const run = await getRun(h.runId);
-        if (run && BUSY.has(run.status) && matchesTarget(run, opts)) return run;
-      }
-    } catch (err) {
-      console.warn("[correlate] lease lookup failed; falling back to run scan:", err);
-    }
-  } else {
-    const ids = await listActiveRunIds();
-    for (const id of ids) {
-      const run = await getRun(id);
-      if (run && BUSY.has(run.status) && matchesTarget(run, opts)) return run;
+  const leasedRunIds = await leasedRunIdSet();
+
+  for (const runId of leasedRunIds) {
+    const run = await getRun(runId);
+    if (run && isActiveInvestigationRun(run, leasedRunIds) && matchesTarget(run, opts)) {
+      return run;
     }
   }
 
   const runs = await listRuns();
-  return runs.find((r) => BUSY.has(r.status) && matchesTarget(r, opts));
+  return runs.find(
+    (r) => isActiveInvestigationRun(r, leasedRunIds) && matchesTarget(r, opts),
+  );
 }

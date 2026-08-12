@@ -15,14 +15,29 @@ const CAPACITY_HINTS = [
   "max per service",
 ];
 
+function blockingRunId(message: string): string | null {
+  const m = message.match(/blocking run (run_[a-z0-9_]+)/i);
+  return m?.[1] ?? null;
+}
+
 function ErrorBanner({ message }: { message: string }) {
   const capacity = CAPACITY_HINTS.some((h) => message.includes(h));
+  const blocker = blockingRunId(message);
   return (
     <p style={{ color: "var(--bad)", marginBottom: "1rem" }} className="mono">
       {message}
       {capacity
         ? " — Wait for an investigation slot (see MAX_CONCURRENT_RUNS) or finish the active run for that service."
         : ""}
+      {blocker ? (
+        <>
+          {" "}
+          Blocking run:{" "}
+          <a href={`/?runId=${blocker}`} className="mono">
+            {blocker}
+          </a>
+        </>
+      ) : null}
     </p>
   );
 }
