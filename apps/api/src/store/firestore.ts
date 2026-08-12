@@ -1,7 +1,4 @@
-export {
-  INVESTIGATION_LOCK_SCOPE,
-  SOAK_LOCK_SCOPE,
-} from "./firestoreClient.js";
+export { INVESTIGATION_LOCK_SCOPE } from "./firestoreClient.js";
 export {
   firestoreSaveRun,
   firestoreAppendEvent,
@@ -15,9 +12,4 @@ export {
   firestoreListActiveLeases,
   firestoreCountActiveLeases,
 } from "./firestoreLocks.js";
-export {
-  firestoreSaveSoak,
-  firestoreGetSoak,
-  firestoreGetActiveSoakId,
-} from "./firestoreSoaks.js";
 export { firestoreGetServiceRegistry } from "./firestoreRegistry.js";

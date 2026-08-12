@@ -40,19 +40,6 @@ export async function countActiveLeases(): Promise<number> {
   return activeRunIds.size;
 }
 
-/**
- * True when any leased investigation is still in a busy status.
- * Used by soak to avoid overlapping with live IR work.
- */
-export async function isAnyInvestigationBusy(): Promise<boolean> {
-  const ids = await listActiveRunIds();
-  for (const id of ids) {
-    const run = await getRun(id);
-    if (run && BUSY.has(run.status)) return true;
-  }
-  return false;
-}
-
 export async function tryAcquireLock(runId: string): Promise<boolean> {
   if (config.useDurableStore) {
     const ok = await firestoreTryAcquireLease(

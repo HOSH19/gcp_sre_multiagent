@@ -3,10 +3,17 @@
 Scenarios live in `packages/shared` (`SCENARIOS`) and are executed by:
 
 ```bash
-npm run dev:patient
+# Terminal 1 — patient needs APP_SECRET for a healthy baseline
+APP_SECRET=local-secret npm run dev:patient
+
+# Terminal 2
 npm run dev:chaos
+
+# Terminal 3
 npm run eval
 ```
+
+Set `APP_SECRET=local-secret` in `.env` (see `.env.example`) so the patient starts healthy; the `missing_config` scenario removes it.
 
 Unit tests (no patient/chaos servers required):
 

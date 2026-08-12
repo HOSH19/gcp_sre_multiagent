@@ -3,13 +3,11 @@ import { config } from "../config.js";
 
 export const RUNS = "runs";
 export const EVENTS = "events";
-export const SOAKS = "soaks";
 export const LOCKS = "locks";
 export const CONFIG = "config";
 export const SERVICE_REGISTRY_DOC = "serviceRegistry";
 
 export const INVESTIGATION_LOCK_SCOPE = "investigations";
-export const SOAK_LOCK_SCOPE = "soaks";
 
 export interface LeaseHolder {
   runId: string;
@@ -43,10 +41,6 @@ export function runDocPath(runId: string) {
 
 export function eventsCol(runId: string) {
   return runDocPath(runId).collection(EVENTS);
-}
-
-export function soakDocPath(soakId: string) {
-  return getFirestore().collection(SOAKS).doc(soakId);
 }
 
 export function lockDocPath(scope: string) {

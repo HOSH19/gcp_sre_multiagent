@@ -1,55 +1,19 @@
+import { SCENARIOS, type ScenarioId } from "@gcp-sre/shared";
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api/backend";
 
-/** Scenario ids the API may return (includes legacy). */
-export type ScenarioId = "http_500s" | "missing_config" | "bad_revision_traffic";
+export type {
+  AgentEvent,
+  HypothesisItem,
+  InvestigationRun as Run,
+  ScenarioId,
+} from "@gcp-sre/shared";
 
-export interface AgentEvent {
-  id: string;
-  agent: string;
-  type: string;
-  message: string;
-  at: string;
-  data?: {
-    tool?: string;
-    model?: string;
-    mocked?: boolean;
-    summary?: string;
-    source?: string;
-    raw?: unknown;
-    hypotheses?: unknown;
-    [key: string]: unknown;
-  };
-  tokensIn?: number;
-  tokensOut?: number;
-  costUsdDelta?: number;
-}
+export { SCENARIOS };
 
-export interface Run {
-  id: string;
-  status: string;
-  scenario?: ScenarioId;
-  events: AgentEvent[];
-  hypotheses: Array<{ rootCauseLabel: string; confidence: number; summary: string }>;
-  proposedRemediation: {
-    summary: string;
-    risk: string;
-    actions: Array<{ type: string; reason: string; details?: Record<string, string> }>;
-  } | null;
-  report: {
-    eval?: { matched: boolean; expected: string; predicted: string };
-    healthAfter?: { ok: boolean; detail: string };
-    cost: { totalUsd: number };
-    approval: { decision: string };
-  } | null;
-  costUsd: number;
-  error?: string;
-}
-
-/** UI-selectable scenarios (http_500s removed from the demo surface). */
-export const SCENARIO_OPTIONS: { id: Exclude<ScenarioId, "http_500s">; label: string }[] = [
-  { id: "missing_config", label: "Missing config" },
-  { id: "bad_revision_traffic", label: "Bad revision traffic" },
-];
+export const SCENARIO_OPTIONS: { id: ScenarioId; label: string }[] = Object.values(SCENARIOS).map(
+  (s) => ({ id: s.id, label: s.label }),
+);
 
 export function scenarioLabel(scenario: string): string {
   return SCENARIO_OPTIONS.find((s) => s.id === scenario)?.label ?? scenario;

@@ -20,8 +20,8 @@ async function readLock(scope: string): Promise<LockDoc | null> {
 }
 
 /**
- * Transactional lease acquire for investigation (or soak) scope.
- * `runId` identifies the holder; for soaks the soak id is stored in runId.
+ * Transactional lease acquire for investigation scope.
+ * `runId` identifies the holder.
  */
 export async function firestoreTryAcquireLease(
   scope: string,

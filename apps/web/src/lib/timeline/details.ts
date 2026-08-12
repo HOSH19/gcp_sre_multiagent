@@ -1,7 +1,7 @@
-import type { AgentEvent } from "@/lib/types";
-import { tryParseJson } from "@/lib/timeline/json";
+import type { AgentEvent } from "@gcp-sre/shared";
+import { eventData, tryParseJson } from "@/lib/timeline/json";
 
-function sanitizeData(data: AgentEvent["data"]) {
+function sanitizeData(data: Record<string, unknown> | undefined) {
   if (!data) return data;
   const { raw, ...rest } = data;
   if (raw && typeof raw === "object") return { ...rest, raw };
@@ -14,10 +14,10 @@ export function eventDetails(event: AgentEvent): { kind: "json" | "text"; value:
     if (asJson) {
       return {
         kind: "json",
-        value: JSON.stringify({ thought: asJson, meta: sanitizeData(event.data) }, null, 2),
+        value: JSON.stringify({ thought: asJson, meta: sanitizeData(eventData(event)) }, null, 2),
       };
     }
-    const meta = sanitizeData(event.data);
+    const meta = sanitizeData(eventData(event));
     if (meta && Object.keys(meta).length > 0) {
       return {
         kind: "json",
@@ -27,9 +27,10 @@ export function eventDetails(event: AgentEvent): { kind: "json" | "text"; value:
     return { kind: "text", value: event.message };
   }
 
-  if (!event.data) return null;
+  const data = eventData(event);
+  if (!data) return null;
   return {
     kind: "json",
-    value: JSON.stringify(sanitizeData(event.data), null, 2),
+    value: JSON.stringify(sanitizeData(data), null, 2),
   };
 }

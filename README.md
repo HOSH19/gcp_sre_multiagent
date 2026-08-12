@@ -60,9 +60,9 @@ flowchart TB
   store -.-> api
 ```
 
-Cloud Run services scale to zero by default. In **MODE=gcp**, chaos-controller mutates the real patient service via Cloud Run Admin API (traffic split; env patch for missing config). API tools read **Cloud Logging** and **Cloud Run** state; health checks hit the real patient `/health` (no local chaos overlay). Runs, soak leases, and Scribe artifacts use **Firestore / BigQuery / GCS**. In **MODE=local**, chaos stays in-memory and API tools use canned/overlay behavior for offline eval.
+Cloud Run services scale to zero by default. In **MODE=gcp**, chaos-controller mutates the real patient service via Cloud Run Admin API (traffic split; env patch for missing config). API tools read **Cloud Logging** and **Cloud Run** state; health checks hit the real patient `/health` (no local chaos overlay). Investigation runs and Scribe artifacts use **Firestore / BigQuery / GCS**. In **MODE=local**, chaos stays in-memory and API tools use canned/overlay behavior for offline eval.
 
-### Open the UI
+### Investigate console (GCP)
 
 ```bash
 gcloud run services proxy web --project=sre-multiagent --region=us-central1 --port=8080
@@ -70,9 +70,38 @@ gcloud run services proxy web --project=sre-multiagent --region=us-central1 --po
 
 Then open **http://127.0.0.1:8080**.
 
-From the console you can inject a single scenario, investigate with a human approval gate, or run **Scenario soak** (“Run all scenarios”) — sequential eval of both scenarios with auto-approved remediation (same effectiveness check as CLI). Caps still apply per run. Locally you can still run `npm run eval`.
+From the console you can inject a single scenario and run an investigation with a **human approval gate** before remediation executes. Caps still apply per run. Scenario soak (“Run all scenarios”) has been removed from the UI; batch eval is CLI-only (see below).
 
-In **MODE=gcp**, soak state and investigation leases are **Firestore-backed** (survive multi-instance / cold starts). Locally, soak remains in-process. Check `GET /soak` or `/health` (`activeSoakId`, `activeRunIds`). Clear a stuck soak with `POST /soak/cancel`.
+In **MODE=gcp**, investigation leases are **Firestore-backed** (survive multi-instance / cold starts). Locally, leases remain in-process.
+
+### Local dev — eval harness
+
+Copy `.env.example` to `.env` and set `APP_SECRET=local-secret` for the patient (required for a healthy baseline; `missing_config` removes it).
+
+Three terminals:
+
+```bash
+# Terminal 1 — patient
+APP_SECRET=local-secret npm run dev:patient
+
+# Terminal 2 — chaos controller
+npm run dev:chaos
+
+# Terminal 3 — run both scenarios (auto-inject + auto-approve, same checks as production eval)
+npm run eval
+```
+
+See [evals/README.md](evals/README.md). For the investigate console locally, also run `npm run dev:api` and `npm run dev:web` (or use the GCP proxy above).
+
+### CLI
+
+```bash
+npm run cli -- inject missing_config
+npm run cli -- investigate --scenario bad_revision_traffic
+npm run cli -- approve <runId>
+```
+
+Scenarios: `missing_config`, `bad_revision_traffic`.
 
 ### AuthZ (API / web / chaos)
 
@@ -114,7 +143,7 @@ Vitest unit tests cover shared eval/scenario/caps/policy helpers and API orchest
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| **ci.yml** | push/PR → `main` | `npm ci`, build, and typecheck |
+| **ci.yml** | push/PR → `main` | `npm ci`, build, typecheck, and unit tests |
 | **codeql.yml** | push/PR → `main` (+ weekly) | CodeQL security analysis (JS/TS) |
 | **docker.yml** | push/PR → `main` | Build `patient`, `chaos-controller`, `api`, `web` images (`push: false`) |
 | **deploy-cloud-run.yml** | `workflow_dispatch` only | Manual deploy via WIF; needs `GCP_WORKLOAD_IDENTITY_PROVIDER` + `GCP_SERVICE_ACCOUNT` secrets |

@@ -1,4 +1,5 @@
-import type { AgentEvent } from "@/lib/types";
+import type { AgentEvent } from "@gcp-sre/shared";
+import { eventData } from "@/lib/timeline/json";
 
 const AGENT_COLOR: Record<string, string> = {
   orchestrator: "#8fa3b8",
@@ -31,7 +32,8 @@ export function typeLabel(type: string): string {
 }
 
 export function toolName(event: AgentEvent): string | null {
-  if (event.data?.tool) return String(event.data.tool);
+  const data = eventData(event);
+  if (data?.tool) return String(data.tool);
   const m = event.message.match(/^(?:Calling|Result from)\s+(\S+)/);
   return m?.[1] ?? null;
 }

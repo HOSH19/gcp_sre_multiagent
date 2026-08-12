@@ -7,7 +7,7 @@
 | **API** (`api` Cloud Run) | Deployed with `--no-allow-unauthenticated`. Callers need `roles/run.invoker` (user ADC, Pub/Sub push SA, or web BFF). |
 | **Remediation** | Same API identity. Mutations only after human `POST /runs/:id/approve`; action types are allowlisted in code. |
 | **Web** console | Prefer Identity-Aware Proxy (IAP) in front of the `web` service, or Cloud Run IAM + authenticated proxy (`gcloud run services proxy`). Deep-links use `WEB_ORIGIN/?runId=…`. |
-| **Chaos controller** | Separate Cloud Run service + `CHAOS_ADMIN_TOKEN` (Secret Manager). Used only by API inject / soak paths — **never** registered as an LLM tool. |
+| **Chaos controller** | Separate Cloud Run service + `CHAOS_ADMIN_TOKEN` (Secret Manager). Used only by API inject paths — **never** registered as an LLM tool. |
 
 ### Chaos admin token
 
@@ -36,8 +36,7 @@ Notifications fire (fail-open) on:
 
 Local eval: paging no-ops unless `PAGING=on` and secrets are set.
 
-## Concurrency + soak durability
+## Concurrency
 
 - `MAX_CONCURRENT_RUNS` — global lease slots (`locks/investigations` in Firestore when durable).
 - `MAX_CONCURRENT_PER_SERVICE` — default `1`; blocks a second investigation for the same target (alerts correlate onto the active run).
-- Soak jobs persist to Firestore `soaks/{id}` + soak lease when `MODE=gcp` / `STORE_BACKEND=firestore`. Local/eval remains in-memory.

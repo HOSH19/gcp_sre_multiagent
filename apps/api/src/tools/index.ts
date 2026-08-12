@@ -36,8 +36,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 export type ToolName = keyof typeof toolHandlers;
 
 export { proposeRemediation, patchEnvVars, rollbackTraffic } from "./remediate.js";
-export { getServiceHealth, verifyHealth } from "./health.js";
-export { listCloudRunServices } from "./fleet.js";
+export { verifyHealth } from "./health.js";
 export {
   SCRIBE_TOOL_SEQUENCE,
   writeReport,
@@ -46,5 +45,4 @@ export {
   type ScribeToolArgs,
 } from "./scribe.js";
 export { ensureRemediationProposal } from "./reactTools.js";
-export type { ToolCallContext, ToolHandler } from "./types.js";
 export { toolDeclarations } from "./schemas.js";

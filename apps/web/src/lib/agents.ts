@@ -1,12 +1,8 @@
-export const SPECIALISTS = [
-  "detector",
-  "log_diver",
-  "hypothesis",
-  "mitigator",
-  "scribe",
-] as const;
+import { AGENT_TOOLS, type Specialist } from "@gcp-sre/shared";
 
-export type Specialist = (typeof SPECIALISTS)[number];
+export type { Specialist };
+
+export const SPECIALISTS = Object.keys(AGENT_TOOLS) as Specialist[];
 
 const LABELS: Record<Specialist, string> = {
   detector: "Detector",

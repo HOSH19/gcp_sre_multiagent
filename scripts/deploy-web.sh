@@ -6,7 +6,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
 API_URL="$(run_service_url api)"
-CHAOS_URL="$(run_service_url chaos-controller)"
 PATIENT_URL="$(run_service_url patient)"
 PROJECT_NUMBER="$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')"
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
@@ -27,24 +26,13 @@ gcloud run services add-iam-policy-binding api \
   --member="serviceAccount:${COMPUTE_SA}" \
   --role="roles/run.invoker" --quiet
 
-gcloud run services add-iam-policy-binding chaos-controller \
-  --project="$PROJECT" --region="$REGION" \
-  --member="serviceAccount:${COMPUTE_SA}" \
-  --role="roles/run.invoker" --quiet
-
-gcloud secrets add-iam-policy-binding chaos-admin-token \
-  --project="$PROJECT" \
-  --member="serviceAccount:${COMPUTE_SA}" \
-  --role="roles/secretmanager.secretAccessor" --quiet
-
 echo "==> Deploy web (IAM-only)"
 gcloud run deploy web \
   --project="$PROJECT" --region="$REGION" \
   --image="${REPO}/web:latest" \
   --no-allow-unauthenticated \
   --min-instances=0 --max-instances=2 \
-  --set-env-vars="API_URL=${API_URL},CHAOS_URL=${CHAOS_URL},NEXT_PUBLIC_API_URL=/api/backend,NEXT_PUBLIC_CHAOS_URL=/api/chaos" \
-  --set-secrets="CHAOS_ADMIN_TOKEN=chaos-admin-token:latest" \
+  --set-env-vars="API_URL=${API_URL},NEXT_PUBLIC_API_URL=/api/backend" \
   --quiet
 
 WEB_URL="$(run_service_url web)"

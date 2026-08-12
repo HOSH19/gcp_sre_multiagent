@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { AgentEvent } from "@/lib/types";
+import type { AgentEvent } from "@gcp-sre/shared";
 import { eventDetails, eventSummary, toolName, typeLabel } from "@/lib/timeline";
+import { eventData } from "@/lib/timeline/json";
 
 const TYPE_TONE: Record<string, string> = {
   thought: "var(--muted)",
@@ -35,7 +36,7 @@ export function EventChip({ event }: { event: AgentEvent }) {
           {typeLabel(event.type)}
           {tool ? ` · ${tool}` : ""}
         </span>
-        {event.data?.mocked === false ? (
+        {eventData(event)?.mocked === false ? (
           <span className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>
             live
           </span>

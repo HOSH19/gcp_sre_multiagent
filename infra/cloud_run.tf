@@ -87,7 +87,7 @@ resource "google_monitoring_alert_policy" "patient_uptime" {
   display_name = "patient-unhealthy"
   combiner     = "OR"
   conditions {
-    display_name = "http_500s_or_uptime_fail"
+    display_name = "uptime_or_patient_unhealthy"
     condition_threshold {
       filter          = "resource.type = \"uptime_url\" AND metric.type = \"monitoring.googleapis.com/uptime_check/check_passed\""
       comparison      = "COMPARISON_LT"

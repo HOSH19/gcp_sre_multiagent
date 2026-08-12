@@ -1,5 +1,5 @@
-import type { AgentEvent } from "@/lib/types";
-import { tryParseJson } from "@/lib/timeline/json";
+import type { AgentEvent } from "@gcp-sre/shared";
+import { eventData, tryParseJson } from "@/lib/timeline/json";
 import { toolName } from "@/lib/timeline/meta";
 
 const THOUGHT_FALLBACK: Record<string, string> = {
@@ -74,7 +74,7 @@ function summarizeThought(agent: string, message: string): string {
 }
 
 function evidenceSummary(event: AgentEvent): string | null {
-  const data = event.data;
+  const data = eventData(event);
   if (!data) return null;
   if (typeof data.summary === "string") return data.summary;
   if (data.raw && typeof data.raw === "object" && data.raw !== null && "summary" in data.raw) {
@@ -94,8 +94,9 @@ export function eventSummary(event: AgentEvent): string {
   if (event.type === "thought") {
     return summarizeThought(event.agent, event.message);
   }
-  if (event.type === "status" && event.data) {
-    const asObj = event.data as Record<string, unknown>;
+  if (event.type === "status") {
+    const asObj = eventData(event);
+    if (!asObj) return event.message;
     if (typeof asObj.summary === "string") return asObj.summary;
     if (Array.isArray(asObj.hypotheses) || Array.isArray(asObj.rankedRootCauses)) {
       return summarizeJson(asObj);

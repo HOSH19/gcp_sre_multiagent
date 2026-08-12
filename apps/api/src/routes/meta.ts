@@ -2,20 +2,18 @@ import { Hono } from "hono";
 import { SCENARIOS } from "@gcp-sre/shared";
 import { config } from "../config.js";
 import { loadServiceRegistry } from "../fleet/index.js";
-import { countActiveLeases, getActiveRunId, getActiveSoakId, listActiveRunIds } from "../store/index.js";
+import { countActiveLeases, getActiveRunId, listActiveRunIds } from "../store/index.js";
 
 export function registerMetaRoutes(app: Hono): void {
   app.get("/health", async (c) => {
     let activeRunId: string | null = null;
     let activeRunIds: string[] = [];
     let activeLeaseCount = 0;
-    let activeSoakId: string | null = null;
     let storeError: string | undefined;
     try {
       activeRunId = await getActiveRunId();
       activeRunIds = await listActiveRunIds();
       activeLeaseCount = await countActiveLeases();
-      activeSoakId = await getActiveSoakId();
     } catch (err) {
       storeError = err instanceof Error ? err.message : String(err);
       console.error("[health] store probe failed:", storeError);
@@ -32,7 +30,6 @@ export function registerMetaRoutes(app: Hono): void {
       activeRunId,
       activeRunIds,
       activeLeaseCount,
-      activeSoakId,
       ...(storeError ? { storeError } : {}),
     });
   });
