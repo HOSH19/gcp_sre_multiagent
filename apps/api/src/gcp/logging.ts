@@ -18,6 +18,16 @@ async function accessToken(): Promise<string> {
   return token.token;
 }
 
+function hasMessageBody(entry: LogEntry): boolean {
+  if (entry.textPayload?.trim()) return true;
+  if (entry.jsonPayload) {
+    const msg = entry.jsonPayload.message ?? entry.jsonPayload.msg ?? entry.jsonPayload.error;
+    if (typeof msg === "string" && msg.trim()) return true;
+    if (JSON.stringify(entry.jsonPayload) !== "{}") return true;
+  }
+  return false;
+}
+
 function entryText(entry: LogEntry): string {
   if (entry.textPayload?.trim()) return entry.textPayload.trim();
   if (entry.jsonPayload) {
@@ -26,9 +36,53 @@ function entryText(entry: LogEntry): string {
     const compact = JSON.stringify(entry.jsonPayload);
     if (compact !== "{}") return compact.slice(0, 200);
   }
-  const severity = entry.severity ?? "ERROR";
-  const ts = entry.timestamp ?? "unknown time";
-  return `${severity} log entry at ${ts} (no message body)`;
+  return "";
+}
+
+/** Collapses body-less ERROR rows into one bucket; groups distinct messages by text. */
+export function groupErrorEntries(
+  entries: Array<{ timestamp?: string; message: string; bodyLess: boolean }>,
+  serviceName: string,
+): Array<{ message: string; count: number }> {
+  const messageCounts = new Map<string, number>();
+  let bodyLessCount = 0;
+  let bodyLessOldest: string | undefined;
+  let bodyLessNewest: string | undefined;
+
+  for (const entry of entries) {
+    if (entry.bodyLess) {
+      bodyLessCount += 1;
+      if (entry.timestamp) {
+        if (!bodyLessOldest || entry.timestamp < bodyLessOldest) bodyLessOldest = entry.timestamp;
+        if (!bodyLessNewest || entry.timestamp > bodyLessNewest) bodyLessNewest = entry.timestamp;
+      }
+      continue;
+    }
+    const key = entry.message.slice(0, 200);
+    messageCounts.set(key, (messageCounts.get(key) ?? 0) + 1);
+  }
+
+  const errors: Array<{ message: string; count: number }> = [...messageCounts.entries()].map(
+    ([message, count]) => ({ message, count }),
+  );
+
+  if (bodyLessCount > 0) {
+    const range =
+      bodyLessOldest && bodyLessNewest
+        ? bodyLessOldest === bodyLessNewest
+          ? ` (${bodyLessOldest})`
+          : ` (${bodyLessOldest} .. ${bodyLessNewest})`
+        : bodyLessOldest || bodyLessNewest
+          ? ` (${bodyLessOldest ?? bodyLessNewest})`
+          : "";
+    errors.unshift({
+      message: `${bodyLessCount} ERROR log entries (no message body) on ${serviceName} — likely health-check/503 failures${range}`,
+      count: bodyLessCount,
+    });
+  }
+
+  if (!errors.length) return [{ message: "No recent error-severity log entries", count: 0 }];
+  return errors;
 }
 
 /** Human-readable summary for grouped error log entries (avoids confusing "(empty) (n=40)"). */
@@ -46,7 +100,7 @@ export async function queryServiceLogs(opts?: {
   serviceName?: string;
   projectId?: string;
   region?: string;
-}): Promise<Array<{ timestamp?: string; severity?: string; message: string; revision?: string }>> {
+}): Promise<Array<{ timestamp?: string; severity?: string; message: string; bodyLess: boolean; revision?: string }>> {
   const token = await accessToken();
   const serviceName = opts?.serviceName ?? config.patientServiceName;
   const projectId = opts?.projectId ?? config.projectId;
@@ -79,6 +133,7 @@ export async function queryServiceLogs(opts?: {
     timestamp: e.timestamp,
     severity: e.severity,
     message: entryText(e),
+    bodyLess: !hasMessageBody(e),
     revision: e.resource?.labels?.revision_name,
   }));
 }
@@ -86,19 +141,13 @@ export async function queryServiceLogs(opts?: {
 export async function queryServiceErrors(
   opts?: { pageSize?: number; serviceName?: string; projectId?: string; region?: string },
 ): Promise<Array<{ message: string; count: number }>> {
+  const serviceName = opts?.serviceName ?? config.patientServiceName;
   const entries = await queryServiceLogs({
     filterExtra: "severity>=ERROR",
     pageSize: opts?.pageSize ?? 30,
-    serviceName: opts?.serviceName,
+    serviceName,
     projectId: opts?.projectId,
     region: opts?.region,
   });
-  const counts = new Map<string, number>();
-  for (const e of entries) {
-    const key = e.message.slice(0, 200);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  const errors = [...counts.entries()].map(([message, count]) => ({ message, count }));
-  if (!errors.length) return [{ message: "No recent error-severity log entries", count: 0 }];
-  return errors;
+  return groupErrorEntries(entries, serviceName);
 }
