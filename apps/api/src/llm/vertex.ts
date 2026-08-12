@@ -59,13 +59,20 @@ export async function callVertex(model: string, system: string, prompt: string):
   const token = await accessToken();
   if (!token) return null;
 
-  const res = await fetch(vertexUrl(model), {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: `${system}\n\n${prompt}` }] }],
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(vertexUrl(model), {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: `${system}\n\n${prompt}` }] }],
+      }),
+      signal: AbortSignal.timeout(config.vertexFetchTimeoutMs),
+    });
+  } catch (err) {
+    console.warn("Vertex fetch failed", err instanceof Error ? err.message : String(err));
+    return null;
+  }
   if (!res.ok) {
     console.warn("Vertex error", res.status, await res.text());
     return null;
@@ -117,11 +124,18 @@ export async function callVertexWithTools(opts: {
     };
   }
 
-  const res = await fetch(vertexUrl(opts.model), {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(vertexUrl(opts.model), {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(config.vertexFetchTimeoutMs),
+    });
+  } catch (err) {
+    console.warn("Vertex tools fetch failed", err instanceof Error ? err.message : String(err));
+    return null;
+  }
   if (!res.ok) {
     console.warn("Vertex tools error", res.status, await res.text());
     return null;

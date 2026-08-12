@@ -45,6 +45,8 @@ export const config = {
   flashLiteModel: process.env.GEMINI_FLASH_LITE_MODEL ?? "gemini-2.5-flash-lite",
   flashModel: process.env.GEMINI_FLASH_MODEL ?? "gemini-2.5-flash",
   vertexLocation: process.env.VERTEX_LOCATION ?? "us-central1",
+  /** Abort hung Vertex generateContent calls (ReAct). */
+  vertexFetchTimeoutMs: Math.max(5_000, Number(process.env.VERTEX_FETCH_TIMEOUT_MS ?? 120_000)),
   /** Prefer Firestore when true; memory otherwise. */
   useDurableStore: storeBackend === "firestore",
   storeBackend,

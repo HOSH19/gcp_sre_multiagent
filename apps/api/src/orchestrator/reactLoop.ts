@@ -190,6 +190,12 @@ export async function runReactLoop(opts: ReactAgentOpts): Promise<{ text: string
     }
 
     if (!stillNeedsTools(allowed, toolsCalled, terminal) && terminal.size === 0) {
+      await appendEvent(run.id, {
+        agent,
+        type: "status",
+        message: `${agent} ReAct complete (${toolsCalled.length} tools)`,
+        data: { toolsCalled },
+      });
       await saveRun(run);
       return { text: lastText, toolsCalled };
     }

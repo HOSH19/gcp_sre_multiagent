@@ -1,3 +1,7 @@
+export function missingTools(allowed: string[], toolsCalled: string[]): string[] {
+  return allowed.filter((t) => !toolsCalled.includes(t));
+}
+
 export function stillNeedsTools(
   allowed: string[],
   toolsCalled: string[],
