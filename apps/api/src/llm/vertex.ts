@@ -31,6 +31,22 @@ function vertexUrl(model: string): string {
   return `https://${config.vertexLocation}-aiplatform.googleapis.com/v1/projects/${config.projectId}/locations/${config.vertexLocation}/publishers/google/models/${model}:generateContent`;
 }
 
+function vertexFetchError(label: string, err: unknown): never {
+  const msg = err instanceof Error ? err.message : String(err);
+  const cause =
+    err instanceof Error && err.cause instanceof Error
+      ? ` (${err.cause.name}: ${err.cause.message})`
+      : "";
+  console.warn(label, msg + cause);
+  throw new Error(`${label}: ${msg}${cause}`);
+}
+
+function vertexHttpError(label: string, status: number, body: string): never {
+  const detail = body.slice(0, 500);
+  console.warn(label, status, detail);
+  throw new Error(`${label} HTTP ${status}: ${detail}`);
+}
+
 function toResult(model: string, data: VertexResponse, fallbackIn: number): LlmResult {
   const parts = data.candidates?.[0]?.content?.parts ?? [];
   const text = parts.map((p) => p.text ?? "").join("");
@@ -70,12 +86,10 @@ export async function callVertex(model: string, system: string, prompt: string):
       signal: AbortSignal.timeout(config.vertexFetchTimeoutMs),
     });
   } catch (err) {
-    console.warn("Vertex fetch failed", err instanceof Error ? err.message : String(err));
-    return null;
+    vertexFetchError("Vertex fetch failed", err);
   }
   if (!res.ok) {
-    console.warn("Vertex error", res.status, await res.text());
-    return null;
+    vertexHttpError("Vertex error", res.status, await res.text());
   }
   const data = (await res.json()) as VertexResponse;
   return toResult(model, data, Math.ceil((system.length + prompt.length) / 4));
@@ -133,12 +147,10 @@ export async function callVertexWithTools(opts: {
       signal: AbortSignal.timeout(config.vertexFetchTimeoutMs),
     });
   } catch (err) {
-    console.warn("Vertex tools fetch failed", err instanceof Error ? err.message : String(err));
-    return null;
+    vertexFetchError("Vertex tools fetch failed", err);
   }
   if (!res.ok) {
-    console.warn("Vertex tools error", res.status, await res.text());
-    return null;
+    vertexHttpError("Vertex tools error", res.status, await res.text());
   }
   const data = (await res.json()) as VertexResponse;
   const approxIn = Math.ceil(JSON.stringify(opts.contents).length / 4);

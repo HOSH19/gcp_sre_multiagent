@@ -1,18 +1,12 @@
 import { AGENT_TOOLS, type EvidenceItem, type InvestigationRun, type Specialist } from "@gcp-sre/shared";
-import { config } from "../config.js";
 import { generateText } from "../llm/index.js";
+import { modelFor } from "./agentModel.js";
 import { appendEvent, saveRun, syncRunToFirestore } from "../store/index.js";
 import { toolHandlers, type ToolName } from "../tools/index.js";
 import { assertCaps } from "./caps.js";
 
 function isEvidence(value: unknown): value is EvidenceItem {
   return Boolean(value && typeof value === "object" && "id" in value && "source" in value);
-}
-
-function modelFor(agent: Specialist): string {
-  return agent === "hypothesis" || agent === "mitigator"
-    ? config.flashModel
-    : config.flashLiteModel;
 }
 
 export async function runTool(

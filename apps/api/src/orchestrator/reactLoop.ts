@@ -1,6 +1,6 @@
 import { AGENT_TOOLS, type InvestigationRun, type Specialist } from "@gcp-sre/shared";
-import { config } from "../config.js";
 import { generateWithTools, type LlmContent, type ToolChoiceMode } from "../llm/index.js";
+import { modelFor } from "./agentModel.js";
 import { appendEvent, saveRun } from "../store/index.js";
 import { toolDeclarations } from "../tools/schemas.js";
 import { assertCaps } from "./caps.js";
@@ -31,10 +31,6 @@ export interface ReactAgentOpts {
   terminalTools?: string[];
   /** Extra args merged into every runTool call (e.g. Scribe decision/cost). */
   toolArgs?: Record<string, unknown>;
-}
-
-function modelFor(agent: Specialist): string {
-  return agent === "hypothesis" || agent === "mitigator" ? config.flashModel : config.flashLiteModel;
 }
 
 function safeResponsePayload(result: unknown): Record<string, unknown> {

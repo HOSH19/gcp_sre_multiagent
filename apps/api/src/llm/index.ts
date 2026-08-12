@@ -14,8 +14,17 @@ export async function generateText(opts: {
   prompt: string;
   mockText?: string;
 }): Promise<LlmResult> {
-  const live = await callVertex(opts.model, opts.system, opts.prompt);
-  if (live) return live;
+  try {
+    const live = await callVertex(opts.model, opts.system, opts.prompt);
+    if (live) return live;
+  } catch (err) {
+    if (config.mode === "gcp") {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Vertex LLM call failed for model=${opts.model}: ${detail} (no mock fallback in MODE=gcp)`,
+      );
+    }
+  }
 
   if (config.mode === "gcp") {
     throw new Error(
@@ -33,8 +42,17 @@ export async function generateWithTools(opts: {
   toolChoice?: ToolChoiceMode;
   mockText?: string;
 }): Promise<LlmResult> {
-  const live = await callVertexWithTools(opts);
-  if (live) return live;
+  try {
+    const live = await callVertexWithTools(opts);
+    if (live) return live;
+  } catch (err) {
+    if (config.mode === "gcp") {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Vertex function-calling failed for model=${opts.model}: ${detail} (no mock fallback in MODE=gcp)`,
+      );
+    }
+  }
 
   if (config.mode === "gcp") {
     throw new Error(
